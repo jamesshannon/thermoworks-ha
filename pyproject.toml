@@ -1,0 +1,24 @@
+[project]
+name = "thermoworks-ha"
+version = "0.1.0"
+description = "Home Assistant custom component for ThermoWorks Bluetooth thermometers"
+requires-python = ">=3.12"
+
+[project.optional-dependencies]
+dev = [
+    "bleak>=0.21.0",
+    "pytest>=7.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
