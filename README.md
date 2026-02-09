@@ -24,7 +24,7 @@ Home Assistant custom integration for ThermoWorks Bluetooth thermometers.
 1. Open HACS in Home Assistant
 2. Click the three dots in the top right corner
 3. Select "Custom repositories"
-4. Add this repository URL: `https://github.com/jshannon/thermoworks-ha`
+4. Add this repository URL: `https://github.com/jamesshannon/thermoworks-ha`
 5. Select category: "Integration"
 6. Click "Add"
 7. Find "ThermoWorks" in HACS and install
@@ -108,6 +108,6 @@ Contributions are welcome! Please:
 
 ## Support
 
-- 🐛 [Report bugs](https://github.com/jshannon/thermoworks-ha/issues)
-- 💡 [Request features](https://github.com/jshannon/thermoworks-ha/issues)
-- 📖 [Documentation](https://github.com/jshannon/thermoworks-ha)
+- 🐛 [Report bugs](https://github.com/jamesshannon/thermoworks-ha/issues)
+- 💡 [Request features](https://github.com/jamesshannon/thermoworks-ha/issues)
+- 📖 [Documentation](https://github.com/jamesshannon/thermoworks-ha)
