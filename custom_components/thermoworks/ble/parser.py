@@ -37,7 +37,6 @@ class ThermoWorksBluetoothDeviceData(BluetoothData):
 
     def __init__(self) -> None:
         super().__init__()
-        self._last_full_update: float = 0.0
 
     def _start_update(self, data: BluetoothServiceInfoBleak) -> None:
         """Handle BLE advertisement data.
@@ -46,10 +45,18 @@ class ThermoWorksBluetoothDeviceData(BluetoothData):
         device metadata but does NOT parse temperature — that requires an
         active GATT connection via async_poll().
         """
+        _LOGGER.debug(
+            "Received advertisement from %s (RSSI: %d)", data.name, data.rssi
+        )
         if is_bluedot(data.name):
             self.set_device_type("BlueDOT")
             self.set_device_name(data.name)
             self.set_device_manufacturer("ThermoWorks")
+            # Update RSSI from advertisement
+            self.update_predefined_sensor(
+                SensorLibrary.SIGNAL_STRENGTH__SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+                data.rssi,
+            )
 
     def poll_needed(
         self, service_info: BluetoothServiceInfoBleak, last_poll: float | None
@@ -63,10 +70,23 @@ class ThermoWorksBluetoothDeviceData(BluetoothData):
         Returns:
             True if a new poll should be initiated.
         """
-        return (
-            not self._last_full_update
-            or (monotonic_time_coarse() - self._last_full_update) > MIN_POLL_INTERVAL
+        now = monotonic_time_coarse()
+        if last_poll is None:
+            _LOGGER.debug(
+                "Poll needed for %s: no previous poll", self.get_device_name()
+            )
+            return True
+
+        time_since_poll = now - last_poll
+        needed = time_since_poll > MIN_POLL_INTERVAL
+        _LOGGER.debug(
+            "Poll needed check for %s: %.1fs since last poll (min: %.1fs) -> %s",
+            self.get_device_name(),
+            time_since_poll,
+            MIN_POLL_INTERVAL,
+            needed,
         )
+        return needed
 
     async def async_poll(self, ble_device: BLEDevice) -> SensorUpdate:
         """Connect to the device and read temperature data.
@@ -83,7 +103,6 @@ class ThermoWorksBluetoothDeviceData(BluetoothData):
         _LOGGER.debug("Polling ThermoWorks device %s", self.get_device_name())
         reading = await self._async_connect_and_read(ble_device)
         self._apply_reading(reading)
-        self._last_full_update = monotonic_time_coarse()
         return self._finish_update()
 
     def _apply_reading(self, reading: BlueDOTReading) -> None:
@@ -124,13 +143,16 @@ class ThermoWorksBluetoothDeviceData(BluetoothData):
             asyncio.TimeoutError: If no notification is received in time.
             BleakError: On connection failure.
         """
+        _LOGGER.debug("Connecting to %s", ble_device.address)
         reading_event = asyncio.Event()
         reading: BlueDOTReading | None = None
 
         def _on_notification(_sender: int, data: bytearray) -> None:
             nonlocal reading
+            _LOGGER.debug("Received notification: %s", data.hex())
             try:
                 reading = parse_notification_data(bytes(data))
+                _LOGGER.debug("Parsed reading: %s", reading)
             except ValueError:
                 _LOGGER.warning(
                     "Failed to parse notification data from %s: %s",
@@ -144,15 +166,18 @@ class ThermoWorksBluetoothDeviceData(BluetoothData):
             BleakClient, ble_device, ble_device.address
         )
         try:
+            _LOGGER.debug("Connected, starting notification subscription")
             await client.start_notify(CHARACTERISTIC_UUID, _on_notification)
             try:
                 await asyncio.wait_for(
                     reading_event.wait(), timeout=NOTIFICATION_TIMEOUT
                 )
+                _LOGGER.debug("Notification received successfully")
             finally:
                 await client.stop_notify(CHARACTERISTIC_UUID)
         finally:
             await client.disconnect()
+            _LOGGER.debug("Disconnected from %s", ble_device.address)
 
         assert reading is not None
         return reading

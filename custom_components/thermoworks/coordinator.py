@@ -57,6 +57,11 @@ class ThermoWorksCoordinator(
         Processes advertisements for device identification and RSSI tracking.
         Temperature data is NOT available from advertisements.
         """
+        _LOGGER.debug(
+            "Advertisement received: %s (RSSI: %d)",
+            service_info.name,
+            service_info.rssi,
+        )
         return self._data.update(service_info)
 
     @callback
@@ -64,15 +69,22 @@ class ThermoWorksCoordinator(
         self, service_info: BluetoothServiceInfoBleak, last_poll: float | None
     ) -> bool:
         """Return True when a GATT poll is needed for fresh data."""
-        return (
-            not self.hass.is_stopping
-            and self._data.poll_needed(service_info, last_poll)
-            and bool(
-                async_ble_device_from_address(
-                    self.hass, service_info.device.address, connectable=True
-                )
-            )
+        if self.hass.is_stopping:
+            _LOGGER.debug("Poll skipped: Home Assistant is stopping")
+            return False
+
+        if not self._data.poll_needed(service_info, last_poll):
+            return False
+
+        device = async_ble_device_from_address(
+            self.hass, service_info.device.address, connectable=True
         )
+        if not device:
+            _LOGGER.debug("Poll skipped: device not available for connection")
+            return False
+
+        _LOGGER.debug("Poll will be initiated for %s", service_info.name)
+        return True
 
     async def _async_poll_data(
         self, last_service_info: BluetoothServiceInfoBleak
