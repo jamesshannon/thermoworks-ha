@@ -44,6 +44,8 @@ class ThermoWorksBluetoothDeviceData(BluetoothData):
         Called by BluetoothData.update() on each advertisement. This sets up
         device metadata but does NOT parse temperature — that requires an
         active GATT connection via async_poll().
+
+        Note: RSSI is automatically updated by the base class after this method.
         """
         _LOGGER.debug(
             "Received advertisement from %s (RSSI: %d)", data.name, data.rssi
@@ -52,11 +54,6 @@ class ThermoWorksBluetoothDeviceData(BluetoothData):
             self.set_device_type("BlueDOT")
             self.set_device_name(data.name)
             self.set_device_manufacturer("ThermoWorks")
-            # Update RSSI from advertisement
-            self.update_predefined_sensor(
-                SensorLibrary.SIGNAL_STRENGTH__SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
-                data.rssi,
-            )
 
     def poll_needed(
         self, service_info: BluetoothServiceInfoBleak, last_poll: float | None
