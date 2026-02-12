@@ -38,6 +38,9 @@ class ThermoWorksCoordinator(
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         address = entry.unique_id
         assert address is not None
+        _LOGGER.info(
+            "Initializing ThermoWorks coordinator for device %s", address
+        )
         self._data = ThermoWorksBluetoothDeviceData()
         super().__init__(
             hass=hass,
@@ -49,6 +52,7 @@ class ThermoWorksCoordinator(
             poll_method=self._async_poll_data,
             connectable=True,
         )
+        _LOGGER.info("ThermoWorks coordinator initialized successfully")
 
     @callback
     def _async_on_update(self, service_info: BluetoothServiceInfo) -> SensorUpdate:
@@ -57,9 +61,10 @@ class ThermoWorksCoordinator(
         Processes advertisements for device identification and RSSI tracking.
         Temperature data is NOT available from advertisements.
         """
-        _LOGGER.debug(
-            "Advertisement received: %s (RSSI: %d)",
+        _LOGGER.info(
+            "COORDINATOR CALLBACK: Advertisement received from %s (%s), RSSI: %d",
             service_info.name,
+            service_info.address,
             service_info.rssi,
         )
         return self._data.update(service_info)

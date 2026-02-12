@@ -95,6 +95,55 @@ class TestStartUpdate:
         assert device_info.name == "BlueDOT"
         assert device_info.manufacturer == "ThermoWorks"
 
+    def test_updates_rssi_from_advertisement(self) -> None:
+        """Test that RSSI is updated from advertisements.
+
+        This is a regression test for an AttributeError that occurred when
+        trying to manually update RSSI using a non-existent SensorLibrary
+        constant. The base BluetoothData class handles RSSI automatically.
+        """
+        device = ThermoWorksBluetoothDeviceData()
+        info = _make_service_info(name="BlueDOT")
+        info.rssi = -75  # Set a specific RSSI value
+
+        # This should not raise AttributeError
+        result = device.update(info)
+
+        # Verify RSSI sensor is included in the update
+        assert result.entity_values
+        rssi_values = {
+            key.key: value.native_value
+            for key, value in result.entity_values.items()
+            if "signal_strength" in key.key
+        }
+        assert len(rssi_values) == 1
+        assert list(rssi_values.values())[0] == -75
+
+    def test_updates_rssi_on_each_advertisement(self) -> None:
+        """Test that RSSI updates with each new advertisement."""
+        device = ThermoWorksBluetoothDeviceData()
+        info = _make_service_info(name="BlueDOT")
+
+        # First advertisement with RSSI -70
+        info.rssi = -70
+        result1 = device.update(info)
+        rssi1 = next(
+            (v.native_value for k, v in result1.entity_values.items()
+             if "signal_strength" in k.key),
+            None
+        )
+        assert rssi1 == -70
+
+        # Second advertisement with RSSI -65 (closer to device)
+        info.rssi = -65
+        result2 = device.update(info)
+        rssi2 = next(
+            (v.native_value for k, v in result2.entity_values.items()
+             if "signal_strength" in k.key),
+            None
+        )
+        assert rssi2 == -65
+
     def test_skips_non_bluedot(self) -> None:
         """Test that update() skips unknown devices."""
         device = ThermoWorksBluetoothDeviceData()
@@ -118,21 +167,21 @@ class TestPollNeeded:
     def test_poll_not_needed_within_interval(self, mock_time: MagicMock) -> None:
         """Test that poll is not needed within the minimum interval."""
         device = ThermoWorksBluetoothDeviceData()
-        device._last_full_update = 100.0
-        mock_time.return_value = 110.0  # 10 seconds later
+        mock_time.return_value = 110.0  # Current time
 
         info = _make_service_info()
-        assert device.poll_needed(info, None) is False
+        last_poll = 100.0  # Last poll was 10 seconds ago
+        assert device.poll_needed(info, last_poll) is False
 
     @patch("custom_components.thermoworks.ble.parser.monotonic_time_coarse")
     def test_poll_needed_after_interval(self, mock_time: MagicMock) -> None:
         """Test that poll is needed after the minimum interval."""
         device = ThermoWorksBluetoothDeviceData()
-        device._last_full_update = 100.0
-        mock_time.return_value = 131.0  # 31 seconds later
+        mock_time.return_value = 131.0  # Current time
 
         info = _make_service_info()
-        assert device.poll_needed(info, None) is True
+        last_poll = 100.0  # Last poll was 31 seconds ago
+        assert device.poll_needed(info, last_poll) is True
 
 
 class TestAsyncPoll:
