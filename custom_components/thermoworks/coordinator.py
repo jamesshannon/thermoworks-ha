@@ -81,6 +81,8 @@ class ThermoWorksCoordinator(
         This is called periodically by the timer to ensure we get updates even if
         advertisements aren't triggering polls.
         """
+        from bleak.exc import BleakError
+
         _LOGGER.debug("Fallback timer triggered, checking if poll is needed")
 
         # Get the device to poll
@@ -89,18 +91,32 @@ class ThermoWorksCoordinator(
         )
 
         if device is None:
-            _LOGGER.debug("Device not available for timer poll")
+            _LOGGER.debug("Device not available for timer poll (out of range or off)")
+            # Mark entities as unavailable but keep them registered
+            self._mark_unavailable()
             return
 
         # Manually trigger a poll
         try:
             _LOGGER.info("Executing timer-based poll for %s", self.address)
             update = await self._data.async_poll(device)
-            # Push the update to registered processors
+            # Push the update to registered processors (marks as available)
             self.async_set_updated_data(update)
             _LOGGER.debug("Timer poll completed successfully")
+        except (TimeoutError, asyncio.TimeoutError):
+            _LOGGER.debug("Timer poll timed out (device may be out of range or off)")
+            self._mark_unavailable()
+        except BleakError as err:
+            if "Failed to connect" in str(err) or "not found" in str(err):
+                _LOGGER.debug(
+                    "Timer poll failed: device unreachable (may be off or out of range)"
+                )
+            else:
+                _LOGGER.warning("Timer poll failed with Bluetooth error: %s", err)
+            self._mark_unavailable()
         except Exception as err:
             _LOGGER.warning("Timer poll failed: %s", err, exc_info=True)
+            self._mark_unavailable()
 
     @callback
     def _async_on_update(self, service_info: BluetoothServiceInfo) -> SensorUpdate:
@@ -144,3 +160,13 @@ class ThermoWorksCoordinator(
     ) -> SensorUpdate:
         """Poll the device via GATT connection for temperature data."""
         return await self._data.async_poll(last_service_info.device)
+
+    def _mark_unavailable(self) -> None:
+        """Mark the device as unavailable.
+
+        This keeps entities registered but marks them as unavailable,
+        preventing the 'no longer being provided' message.
+        """
+        _LOGGER.debug("Marking device as unavailable")
+        for processor in self._processors:
+            processor.async_handle_unavailable()
