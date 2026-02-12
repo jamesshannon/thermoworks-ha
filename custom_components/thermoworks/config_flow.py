@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import voluptuous as vol
@@ -15,6 +16,8 @@ from homeassistant.const import CONF_ADDRESS
 
 from .ble.parser import ThermoWorksBluetoothDeviceData
 from .const import DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class ThermoWorksConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -72,15 +75,36 @@ class ThermoWorksConfigFlow(ConfigFlow, domain=DOMAIN):
             )
 
         current_addresses = self._async_current_ids(include_ignore=False)
+        _LOGGER.info("Config flow: Searching for ThermoWorks devices...")
+        _LOGGER.debug("Current configured addresses: %s", current_addresses)
+
+        discovered_count = 0
         for discovery_info in async_discovered_service_info(self.hass, False):
+            discovered_count += 1
             address = discovery_info.address
+            name = discovery_info.name
+            _LOGGER.debug(
+                "Checking discovered device: %s (%s)", name, address
+            )
+
             if address in current_addresses or address in self._discovered_devices:
+                _LOGGER.debug("  Skipping: already configured or in list")
                 continue
+
             device = ThermoWorksBluetoothDeviceData()
-            if device.supported(discovery_info):
-                self._discovered_devices[address] = (
-                    device.get_device_name() or discovery_info.name
-                )
+            is_supported = device.supported(discovery_info)
+            _LOGGER.debug("  Is supported: %s", is_supported)
+
+            if is_supported:
+                device_name = device.get_device_name() or discovery_info.name
+                self._discovered_devices[address] = device_name
+                _LOGGER.info("Found ThermoWorks device: %s (%s)", device_name, address)
+
+        _LOGGER.info(
+            "Discovery complete: checked %d devices, found %d ThermoWorks devices",
+            discovered_count,
+            len(self._discovered_devices),
+        )
 
         if not self._discovered_devices:
             return self.async_abort(reason="no_devices_found")

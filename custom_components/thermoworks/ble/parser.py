@@ -48,12 +48,19 @@ class ThermoWorksBluetoothDeviceData(BluetoothData):
         Note: RSSI is automatically updated by the base class after this method.
         """
         _LOGGER.debug(
-            "Received advertisement from %s (RSSI: %d)", data.name, data.rssi
+            "_start_update called for device: name='%s', address=%s, RSSI=%d",
+            data.name, data.address, data.rssi
         )
-        if is_bluedot(data.name):
+        is_supported = is_bluedot(data.name)
+        _LOGGER.debug("  is_bluedot('%s') = %s", data.name, is_supported)
+
+        if is_supported:
+            _LOGGER.debug("  Setting device metadata for BlueDOT")
             self.set_device_type("BlueDOT")
             self.set_device_name(data.name)
             self.set_device_manufacturer("ThermoWorks")
+        else:
+            _LOGGER.debug("  Not a BlueDOT device, skipping")
 
     def poll_needed(
         self, service_info: BluetoothServiceInfoBleak, last_poll: float | None

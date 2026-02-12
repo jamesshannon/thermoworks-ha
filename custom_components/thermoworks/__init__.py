@@ -30,6 +30,8 @@ async def async_setup_entry(
     # Only start after all platforms have had a chance to subscribe.
     _LOGGER.info("Starting coordinator...")
     entry.async_on_unload(coordinator.async_start())
+    # Start fallback timer-based polling to ensure updates even without advertisements
+    coordinator.start_fallback_poll()
     _LOGGER.info("ThermoWorks integration setup complete")
     return True
 

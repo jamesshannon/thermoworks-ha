@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 import logging
 
 from sensor_state_data import SensorUpdate
@@ -17,10 +18,14 @@ from homeassistant.components.bluetooth.active_update_processor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.event import async_track_time_interval
 
 from .ble.parser import ThermoWorksBluetoothDeviceData
 
 _LOGGER = logging.getLogger(__name__)
+
+# Fallback polling interval when advertisements aren't triggering polls
+FALLBACK_POLL_INTERVAL = timedelta(seconds=60)
 
 
 class ThermoWorksCoordinator(
@@ -42,6 +47,7 @@ class ThermoWorksCoordinator(
             "Initializing ThermoWorks coordinator for device %s", address
         )
         self._data = ThermoWorksBluetoothDeviceData()
+        self._entry = entry
         super().__init__(
             hass=hass,
             logger=_LOGGER,
@@ -53,6 +59,47 @@ class ThermoWorksCoordinator(
             connectable=True,
         )
         _LOGGER.info("ThermoWorks coordinator initialized successfully")
+
+    def start_fallback_poll(self) -> None:
+        """Start fallback timer-based polling.
+
+        This ensures polling happens even if advertisements aren't coming through,
+        which can occur due to HA's advertisement deduplication or device behavior.
+        """
+        _LOGGER.info(
+            "Starting fallback polling timer (interval: %s)", FALLBACK_POLL_INTERVAL
+        )
+        self._entry.async_on_unload(
+            async_track_time_interval(
+                self.hass, self._async_timer_poll, FALLBACK_POLL_INTERVAL
+            )
+        )
+
+    async def _async_timer_poll(self, _now) -> None:
+        """Fallback timer-triggered poll.
+
+        This is called periodically by the timer to ensure we get updates even if
+        advertisements aren't triggering polls.
+        """
+        _LOGGER.debug("Fallback timer triggered, checking if poll is needed")
+
+        # Get the device to poll
+        device = async_ble_device_from_address(
+            self.hass, self.address, connectable=True
+        )
+
+        if device is None:
+            _LOGGER.debug("Device not available for timer poll")
+            return
+
+        # Manually trigger a poll
+        try:
+            _LOGGER.info("Executing timer-based poll for %s", self.address)
+            update = await self._data.async_poll(device)
+            # Manually process the update through registered processors
+            self._async_handle_update(update)
+        except Exception as err:
+            _LOGGER.warning("Timer poll failed: %s", err, exc_info=True)
 
     @callback
     def _async_on_update(self, service_info: BluetoothServiceInfo) -> SensorUpdate:
