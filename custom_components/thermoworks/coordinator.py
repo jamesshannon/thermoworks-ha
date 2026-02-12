@@ -96,8 +96,9 @@ class ThermoWorksCoordinator(
         try:
             _LOGGER.info("Executing timer-based poll for %s", self.address)
             update = await self._data.async_poll(device)
-            # Manually process the update through registered processors
-            self._async_handle_update(update)
+            # Push the update to registered processors
+            self.async_set_updated_data(update)
+            _LOGGER.debug("Timer poll completed successfully")
         except Exception as err:
             _LOGGER.warning("Timer poll failed: %s", err, exc_info=True)
 
