@@ -147,6 +147,8 @@ class ThermoWorksBluetoothDeviceData(BluetoothData):
             asyncio.TimeoutError: If no notification is received in time.
             BleakError: On connection failure.
         """
+        from bleak.exc import BleakError
+
         _LOGGER.debug("Connecting to %s", ble_device.address)
         reading_event = asyncio.Event()
         reading: BlueDOTReading | None = None
@@ -171,17 +173,41 @@ class ThermoWorksBluetoothDeviceData(BluetoothData):
         )
         try:
             _LOGGER.debug("Connected, starting notification subscription")
-            await client.start_notify(CHARACTERISTIC_UUID, _on_notification)
+            try:
+                await client.start_notify(CHARACTERISTIC_UUID, _on_notification)
+            except BleakError as err:
+                if "Notify acquired" in str(err):
+                    _LOGGER.debug(
+                        "Notification already subscribed, waiting briefly and retrying"
+                    )
+                    # Wait a moment for BlueZ to clean up previous subscription
+                    await asyncio.sleep(0.5)
+                    # Try to stop any existing subscription first
+                    try:
+                        await client.stop_notify(CHARACTERISTIC_UUID)
+                    except Exception:
+                        pass  # Ignore errors, subscription might not exist
+                    # Retry the subscription
+                    await client.start_notify(CHARACTERISTIC_UUID, _on_notification)
+                else:
+                    raise
+
             try:
                 await asyncio.wait_for(
                     reading_event.wait(), timeout=NOTIFICATION_TIMEOUT
                 )
                 _LOGGER.debug("Notification received successfully")
             finally:
-                await client.stop_notify(CHARACTERISTIC_UUID)
+                try:
+                    await client.stop_notify(CHARACTERISTIC_UUID)
+                except Exception as err:
+                    _LOGGER.debug("Error stopping notifications: %s", err)
         finally:
-            await client.disconnect()
-            _LOGGER.debug("Disconnected from %s", ble_device.address)
+            try:
+                await client.disconnect()
+                _LOGGER.debug("Disconnected from %s", ble_device.address)
+            except Exception as err:
+                _LOGGER.debug("Error during disconnect: %s", err)
 
         assert reading is not None
         return reading
