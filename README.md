@@ -16,6 +16,9 @@ Home Assistant custom integration for ThermoWorks Bluetooth thermometers.
 - 🔔 Alarm state tracking
 - 📊 Signal strength (RSSI) monitoring
 - ⚡ Local polling (no cloud required)
+- 🔄 Dual polling mechanism: advertisement-driven + timer fallback (60s)
+- 🏠 Smart unavailable handling - entities persist when device is off/out of range
+- 🔋 Battery-friendly - disconnects immediately after reading
 
 ## Installation
 
@@ -56,9 +59,13 @@ Your device will be added with the following entities:
 ## Technical Details
 
 - **Communication**: BLE GATT notifications via active polling (connect-per-poll pattern)
-- **Polling Interval**: ~30 seconds (configurable)
+- **Polling Strategy**:
+  - Primary: Advertisement-driven (polls when device advertises + 30s elapsed)
+  - Fallback: Timer-based (60s interval) for when advertisements aren't frequent
 - **Temperature Unit**: Always Celsius (device F→C conversion handled automatically)
 - **Dependencies**: Requires Home Assistant's Bluetooth integration
+- **Device Availability**: Entities persist as "unavailable" when device is off or out of range
+- **Connection Management**: Connects only when needed, immediately disconnects to free connection slots
 
 ## Development
 

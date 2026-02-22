@@ -1,0 +1,28 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  release:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate version in manifest
+        run: |
+          release_version="${{ github.event.release.tag_name }}"
+          release_version="${release_version#v}"
+          manifest_version=$(jq -r '.version' custom_components/thermoworks/manifest.json)
+          if [ "$manifest_version" != "$release_version" ]; then
+            echo "Version mismatch: manifest.json has $manifest_version but release is $release_version"
+            exit 1
+          fi
+
+      - name: Create release notes
+        run: |
+          echo "Release ${{ github.event.release.tag_name }}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "See CHANGELOG.md for details" >> release_notes.md
