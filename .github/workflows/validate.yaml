@@ -9,9 +9,10 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    name: Validate
+    name: Validate with hassfest and HACS
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: HACS validation
         uses: hacs/action@main
@@ -20,3 +21,28 @@ jobs:
 
       - name: Hassfest validation
         uses: home-assistant/actions/hassfest@master
+
+  tests:
+    runs-on: ubuntu-latest
+    name: Run tests
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest pytest-asyncio pytest-homeassistant-custom-component
+
+      - name: Run BLE tests
+        run: pytest tests/ble/ -v
+
+      - name: Run HA integration tests
+        run: pytest tests/ha/ -v --tb=short
