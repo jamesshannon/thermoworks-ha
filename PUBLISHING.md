@@ -20,18 +20,18 @@ Ensure these files exist and are up to date:
 - [ ] `hacs.json` - HACS configuration
 - [ ] `LICENSE` - MIT license
 - [ ] `CHANGELOG.md` - Version history
-- [ ] `custom_components/thermoworks/manifest.json` - Version and metadata
+- [ ] `custom_components/thermoworks_bt/manifest.json` - Version and metadata
 - [ ] `.github/workflows/validate.yaml` - CI validation
 
 ### 2. Update Version
 
 Before creating a release:
 
-1. Update version in `custom_components/thermoworks/manifest.json`
+1. Update version in `custom_components/thermoworks_bt/manifest.json`
 2. Add entry to `CHANGELOG.md`
 3. Commit changes:
    ```bash
-   git add custom_components/thermoworks/manifest.json CHANGELOG.md
+   git add custom_components/thermoworks_bt/manifest.json CHANGELOG.md
    git commit -m "Bump version to X.Y.Z"
    git push
    ```

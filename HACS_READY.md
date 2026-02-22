@@ -104,7 +104,7 @@ Run these before publishing:
 pytest tests/
 
 # Verify manifest
-cat custom_components/thermoworks/manifest.json | jq .
+cat custom_components/thermoworks_bt/manifest.json | jq .
 
 # Check HACS config
 cat hacs.json | jq .

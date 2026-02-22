@@ -36,7 +36,7 @@ Home Assistant custom integration for ThermoWorks Bluetooth thermometers.
 
 ### Manual Installation
 
-1. Copy the `custom_components/thermoworks` directory to your Home Assistant `config/custom_components/` directory
+1. Copy the `custom_components/thermoworks_bt` directory to your Home Assistant `config/custom_components/` directory
 2. Restart Home Assistant
 
 ## Configuration
@@ -46,7 +46,7 @@ The integration supports automatic Bluetooth discovery:
 1. Make sure your ThermoWorks device is powered on and nearby
 2. Go to **Settings** → **Devices & Services**
 3. Click **+ Add Integration**
-4. Search for "ThermoWorks"
+4. Search for "ThermoWorks Bluetooth"
 5. Select your device from the list
 6. Click **Submit**
 
@@ -68,11 +68,15 @@ Your device will be added with the following entities:
 - **Device Availability**: Entities persist as "unavailable" when device is off or out of range
 - **Connection Management**: Connects only when needed, immediately disconnects to free connection slots
 
+## Differentiation from Core Integration
+
+This integration (`thermoworks_bt`) is for **Bluetooth thermometers** (BlueDOT, etc.) and is separate from the core `thermoworks_smoke` integration which uses IP/API communication for Smoke thermometers.
+
 ## Development
 
 This integration includes:
-- Independent BLE parsing library (`custom_components/thermoworks/ble/`)
-- Comprehensive test suite (39 BLE tests, 5 HA integration tests)
+- Independent BLE parsing library (`custom_components/thermoworks_bt/ble/`)
+- Comprehensive test suite (39 BLE tests, 9 HA integration tests)
 - CLI testing script (`scripts/test_bluedot.py`)
 
 ### Running Tests

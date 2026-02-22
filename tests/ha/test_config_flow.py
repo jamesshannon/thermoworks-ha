@@ -8,7 +8,7 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
-from custom_components.thermoworks.const import DOMAIN
+from custom_components.thermoworks_bt.const import DOMAIN
 
 from . import BLUEDOT_SERVICE_INFO, NOT_THERMOWORKS_SERVICE_INFO
 
@@ -24,7 +24,7 @@ async def test_bluetooth_discovery_valid_device(hass: HomeAssistant) -> None:
     assert result["step_id"] == "bluetooth_confirm"
 
     with patch(
-        "custom_components.thermoworks.async_setup_entry", return_value=True
+        "custom_components.thermoworks_bt.async_setup_entry", return_value=True
     ):
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"], user_input={}
@@ -60,7 +60,7 @@ async def test_user_step_no_devices_found(hass: HomeAssistant) -> None:
 async def test_user_step_with_found_device(hass: HomeAssistant) -> None:
     """Test user setup when a BlueDOT is discovered."""
     with patch(
-        "custom_components.thermoworks.config_flow.async_discovered_service_info",
+        "custom_components.thermoworks_bt.config_flow.async_discovered_service_info",
         return_value=[BLUEDOT_SERVICE_INFO],
     ):
         result = await hass.config_entries.flow.async_init(
@@ -82,7 +82,7 @@ async def test_already_configured(hass: HomeAssistant) -> None:
     assert result["type"] is FlowResultType.FORM
 
     with patch(
-        "custom_components.thermoworks.async_setup_entry", return_value=True
+        "custom_components.thermoworks_bt.async_setup_entry", return_value=True
     ):
         await hass.config_entries.flow.async_configure(
             result["flow_id"], user_input={}

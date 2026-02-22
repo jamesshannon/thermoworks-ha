@@ -26,7 +26,7 @@ Integrate your ThermoWorks Bluetooth thermometers with Home Assistant.
 1. Turn on your ThermoWorks device
 2. Go to **Settings** → **Devices & Services**
 3. Click **+ Add Integration**
-4. Search for "ThermoWorks"
+4. Search for "ThermoWorks Bluetooth"
 5. Select your device
 
 The integration will automatically discover your device and create temperature, probe status, and alarm sensors.

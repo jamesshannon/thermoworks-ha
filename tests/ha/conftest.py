@@ -8,7 +8,7 @@ import pytest
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.thermoworks.const import DOMAIN
+from custom_components.thermoworks_bt.const import DOMAIN
 
 
 @pytest.fixture(autouse=True)

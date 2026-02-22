@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.thermoworks.const import DOMAIN
+from custom_components.thermoworks_bt.const import DOMAIN
 
 from . import BLUEDOT_SERVICE_INFO
 
@@ -22,7 +22,7 @@ async def test_coordinator_setup(
     mock_config_entry.add_to_hass(hass)
 
     with patch(
-        "custom_components.thermoworks.coordinator.ThermoWorksCoordinator.async_start"
+        "custom_components.thermoworks_bt.coordinator.ThermoWorksCoordinator.async_start"
     ):
         assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
 
@@ -37,7 +37,7 @@ async def test_coordinator_unload(
     mock_config_entry.add_to_hass(hass)
 
     with patch(
-        "custom_components.thermoworks.coordinator.ThermoWorksCoordinator.async_start"
+        "custom_components.thermoworks_bt.coordinator.ThermoWorksCoordinator.async_start"
     ):
         await hass.config_entries.async_setup(mock_config_entry.entry_id)
 

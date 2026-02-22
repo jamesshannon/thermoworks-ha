@@ -6,7 +6,7 @@ import struct
 
 import pytest
 
-from custom_components.thermoworks.ble.bluedot import (
+from custom_components.thermoworks_bt.ble.bluedot import (
     NOTIFICATION_DATA_LENGTH,
     BlueDOTReading,
     is_bluedot,

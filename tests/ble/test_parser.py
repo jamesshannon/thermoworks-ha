@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.thermoworks.ble.bluedot import NOTIFICATION_DATA_LENGTH
-from custom_components.thermoworks.ble.parser import (
+from custom_components.thermoworks_bt.ble.bluedot import NOTIFICATION_DATA_LENGTH
+from custom_components.thermoworks_bt.ble.parser import (
     ThermoWorksBluetoothDeviceData,
 )
 
@@ -163,7 +163,7 @@ class TestPollNeeded:
         info = _make_service_info()
         assert device.poll_needed(info, None) is True
 
-    @patch("custom_components.thermoworks.ble.parser.monotonic_time_coarse")
+    @patch("custom_components.thermoworks_bt.ble.parser.monotonic_time_coarse")
     def test_poll_not_needed_within_interval(self, mock_time: MagicMock) -> None:
         """Test that poll is not needed within the minimum interval."""
         device = ThermoWorksBluetoothDeviceData()
@@ -173,7 +173,7 @@ class TestPollNeeded:
         last_poll = 100.0  # Last poll was 10 seconds ago
         assert device.poll_needed(info, last_poll) is False
 
-    @patch("custom_components.thermoworks.ble.parser.monotonic_time_coarse")
+    @patch("custom_components.thermoworks_bt.ble.parser.monotonic_time_coarse")
     def test_poll_needed_after_interval(self, mock_time: MagicMock) -> None:
         """Test that poll is needed after the minimum interval."""
         device = ThermoWorksBluetoothDeviceData()
@@ -210,7 +210,7 @@ class TestAsyncPoll:
         mock_client.disconnect = AsyncMock()
 
         with patch(
-            "custom_components.thermoworks.ble.parser.establish_connection",
+            "custom_components.thermoworks_bt.ble.parser.establish_connection",
             return_value=mock_client,
         ):
             result = await device.async_poll(ble_device)
@@ -247,7 +247,7 @@ class TestAsyncPoll:
         mock_client.disconnect = AsyncMock()
 
         with patch(
-            "custom_components.thermoworks.ble.parser.establish_connection",
+            "custom_components.thermoworks_bt.ble.parser.establish_connection",
             return_value=mock_client,
         ):
             result = await device.async_poll(ble_device)
@@ -281,7 +281,7 @@ class TestAsyncPoll:
         mock_client.disconnect = AsyncMock()
 
         with patch(
-            "custom_components.thermoworks.ble.parser.establish_connection",
+            "custom_components.thermoworks_bt.ble.parser.establish_connection",
             return_value=mock_client,
         ):
             await device.async_poll(ble_device)
@@ -306,11 +306,11 @@ class TestAsyncPoll:
 
         with (
             patch(
-                "custom_components.thermoworks.ble.parser.establish_connection",
+                "custom_components.thermoworks_bt.ble.parser.establish_connection",
                 return_value=mock_client,
             ),
             patch(
-                "custom_components.thermoworks.ble.parser.NOTIFICATION_TIMEOUT",
+                "custom_components.thermoworks_bt.ble.parser.NOTIFICATION_TIMEOUT",
                 0.1,
             ),
             pytest.raises(asyncio.TimeoutError),

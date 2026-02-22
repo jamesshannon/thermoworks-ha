@@ -10,8 +10,8 @@ from homeassistant.const import UnitOfTemperature
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.thermoworks.ble.bluedot import NOTIFICATION_DATA_LENGTH
-from custom_components.thermoworks.const import DOMAIN
+from custom_components.thermoworks_bt.ble.bluedot import NOTIFICATION_DATA_LENGTH
+from custom_components.thermoworks_bt.const import DOMAIN
 
 from . import BLUEDOT_SERVICE_INFO
 
@@ -37,10 +37,10 @@ async def test_sensors_created_from_poll(
 
     with (
         patch(
-            "custom_components.thermoworks.coordinator.ThermoWorksCoordinator.async_start"
+            "custom_components.thermoworks_bt.coordinator.ThermoWorksCoordinator.async_start"
         ),
         patch(
-            "custom_components.thermoworks.ble.parser.establish_connection"
+            "custom_components.thermoworks_bt.ble.parser.establish_connection"
         ) as mock_conn,
     ):
         mock_client = mock_conn.return_value
@@ -68,10 +68,10 @@ async def test_sensor_unit_is_celsius(
 
     with (
         patch(
-            "custom_components.thermoworks.coordinator.ThermoWorksCoordinator.async_start"
+            "custom_components.thermoworks_bt.coordinator.ThermoWorksCoordinator.async_start"
         ),
         patch(
-            "custom_components.thermoworks.ble.parser.establish_connection"
+            "custom_components.thermoworks_bt.ble.parser.establish_connection"
         ) as mock_conn,
     ):
         mock_client = mock_conn.return_value

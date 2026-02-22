@@ -1,6 +1,6 @@
 {
-  "domain": "thermoworks",
-  "name": "ThermoWorks",
+  "domain": "thermoworks_bt",
+  "name": "ThermoWorks Bluetooth",
   "bluetooth": [
     {
       "local_name": "BlueDOT*",
