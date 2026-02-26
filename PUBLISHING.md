@@ -36,7 +36,7 @@ Before creating a release:
    git push
    ```
 
-### 3. Create Git Tag
+### 3. Create and Push Git Tag
 
 ```bash
 # Tag the release (use semantic versioning)
@@ -44,14 +44,11 @@ git tag -a v0.1.0 -m "Release v0.1.0"
 git push origin v0.1.0
 ```
 
-### 4. Create GitHub Release
-
-1. Go to https://github.com/jamesshannon/thermoworks-ha/releases
-2. Click "Create a new release"
-3. Select the tag you just created (v0.1.0)
-4. Title: "v0.1.0 - Initial Release"
-5. Description: Copy from CHANGELOG.md
-6. Click "Publish release"
+**That's it!** 🎉 The GitHub Action will automatically:
+- ✅ Validate the version in manifest.json matches the tag
+- ✅ Extract release notes from CHANGELOG.md
+- ✅ Create a GitHub release with the notes
+- ✅ Notify HACS users of the update
 
 ## Submit to HACS
 
