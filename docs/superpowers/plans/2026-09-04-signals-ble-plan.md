@@ -2124,21 +2124,36 @@ Then confirm CI as in Task 6 Step 8.
 **Files:**
 - Modify: `README.md`, `info.md`, `CHANGELOG.md`, `custom_components/thermoworks_bt/manifest.json`, `pyproject.toml`
 
+- [ ] **Step 0: Fix the upstream `coordinator.py` NameError (deferred from Task 6 review)**
+
+`custom_components/thermoworks_bt/coordinator.py` references `asyncio.TimeoutError` in `_async_timer_poll` but never imports `asyncio` — a timer-poll timeout would raise `NameError` while evaluating the `except` tuple. Add `import asyncio` to the stdlib import block at the top of the file (before `from datetime import timedelta`, keeping isort order). No other change. This cannot be unit-tested locally (HA import); verify with `.venv\Scripts\python -m ruff check custom_components` and the AST syntax check.
+
+- [ ] **Step 0b: Make the upstream HA tests runnable in CI (bounded attempt)**
+
+Every `tests/ha` test that sets up a config entry fails in CI with `RuntimeError: BluetoothManager has not been set` (raised inside `ActiveBluetoothProcessorCoordinator.__init__`), because `tests/ha/conftest.py`'s autouse `mock_bluetooth_setup` fixture patches `homeassistant.components.bluetooth.async_setup` / `async_setup_entry` / `bluetooth_adapters.async_setup` to `True`, so the bluetooth manager is never created. `pytest-homeassistant-custom-component`'s `mock_bluetooth` fixture (already autouse via `auto_mock_bluetooth`) is designed to provide a working mocked manager. Attempt: delete the `mock_bluetooth_setup` fixture (and its `patch` import if unused) from `tests/ha/conftest.py`, commit as `test(ha): let mock_bluetooth provide the manager instead of patching setup`, push, and read the CI "Run HA integration tests" log. Success = the previously failing 5 tests pass (11 passed). If they still fail, revert that commit (`git revert --no-edit <sha>`), push, and record the outcome in the PR body under "Known issues". **Maximum two CI round-trips**; do not iterate further.
+
 - [ ] **Step 1: `README.md`** — under "Supported Devices" add:
 
 ```markdown
 - **Signals** - 4-channel Wi-Fi/Bluetooth thermometer (read-only: temperatures, session min/max, alarm setpoints, derived alarm state, battery, WiFi status). Requires an active-connection-capable Bluetooth proxy (ESP32/ESPHome) or a local adapter; Shelly proxies cannot connect. Close the ThermoWorks phone app — it holds the only BLE connection.
 ```
 
-Under "Configuration" add a Signals entity list:
+Under "Configuration" add a Signals entity list and the v1 caveats:
 
 ```markdown
 For Signals, per probe (1–4): **Temperature**, **Probe** (connected), **High Alarm** / **Low Alarm** (computed in Home Assistant as *temperature ≥ high setpoint* / *≤ low setpoint*; the device does not expose its own alarm flag over BLE), and diagnostic **Session Max/Min**, **High/Low Alarm Setpoint**, **Channel Label**. Device-level: **Battery**, **WiFi** (diagnostic), **Signal Strength**.
+
+Signals caveats (v1):
+- **Units:** Signals sends temperatures in its display unit with no unit marker; this integration assumes the unit is set to **°F**. If you switch the device to °C, every reported temperature will be off by the F→C transform (it is obvious in Home Assistant). Home Assistant itself displays in your configured unit system either way.
+- **Low alarm:** the ThermoWorks app only arms a low alarm after the temperature has first risen above the setpoint; the Home Assistant binary sensor is a plain comparison, so a pit channel with a 225 °F low setpoint reads *on* from a cold start. Automations that care should also check that the probe's Session Max has exceeded the setpoint.
+- **Faulted probe:** an attached probe reporting a fault (device state 2) shows *Probe* on with an *unknown* temperature.
+- **Polling only:** the device advertises notifications but refuses to enable them without the app's handshake, so the integration reads every 30 s over an active connection (ESP32/ESPHome proxies with `active: true`, or a local adapter). Close the ThermoWorks phone app — it holds the only BLE connection.
+- **Battery** is read from a device-info field that is provisional; while charging it fluctuates.
 ```
 
 Update the "Development" bullets: test counts, and add `scripts/dump_signals.py` and `docs/protocol/`. Replace the HACS repository URL with the fork's until upstreamed: `https://github.com/sjmotew/thermoworks-ha`.
 
-- [ ] **Step 2: `info.md`** — add `- **Signals** - 4-channel thermometer (read-only)` under Supported Devices and a one-line note: "Signals alarms are computed by Home Assistant from the device's setpoints."
+- [ ] **Step 2: `info.md`** — add `- **Signals** - 4-channel thermometer (read-only; device must be set to °F)` under Supported Devices and a one-line note: "Signals alarms are computed by Home Assistant from the device's setpoints (low alarms read *on* from a cold start); close the ThermoWorks app while Home Assistant is polling."
 
 - [ ] **Step 3: `CHANGELOG.md`** — add at the top:
 
@@ -2152,6 +2167,9 @@ Update the "Development" bullets: test counts, and add `scripts/dump_signals.py`
 
 ### Changed
 - `parser.py` now only manages the BLE connection; device parsing lives in per-device drivers. BlueDOT behaviour is unchanged.
+
+### Fixed
+- `coordinator.py`: `asyncio` was referenced without being imported; a timer-poll timeout would have raised `NameError`.
 ```
 
 - [ ] **Step 4: Version bump** — `manifest.json` `"version": "0.10.0"`; `pyproject.toml` `version = "0.10.0"`.
@@ -2177,7 +2195,7 @@ CI (`.github/workflows/validate.yaml`) runs hassfest + HACS validation + tests o
 
 - [ ] **Step 7: Hardware acceptance on the live Home Assistant (record results in the PR description)**
 
-Owner does the physical steps; the agent checks state through the HA MCP tools.
+Owner does the physical steps; the agent checks state through the HA MCP tools. **Status 2026-09-04:** items 1–4 were completed by the controller before Task 9 (component deployed via `ha_write_file` at 60ce6b9, M5 Atom proxy online, `Signals 2E0E` discovered and added, 38 entities created; probe 1 = 78.26 °F, empty probes `unknown`/`off`, setpoints/labels exact, battery 88, WiFi on, `probe_1_low_alarm` on). The implementer of this task does NOT repeat them; the controller re-deploys the final files after this task's commit and records items 5–7 if the owner is available. Put the recorded results in the PR body.
 
 1. Re-deploy the final files exactly as in Task 6 Step 9 (`ha_write_file` each file, `ha_restart`), then `ha_get_logs(level="ERROR")` → no `thermoworks_bt` entries.
 2. Owner: power an ESP32 Bluetooth proxy within ~5 m of the Signals. Agent: `ha_get_entity_state` on the proxy's entity shows it available (e.g. `update.esp32_bluetooth_proxy_a93148_firmware` is no longer `unavailable`).
