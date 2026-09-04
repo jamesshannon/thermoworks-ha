@@ -2098,6 +2098,60 @@ Existing upstream config-flow tests assert `result2["data"] == {}` for BlueDOT â
 
 Add a test in `tests/ha/test_config_flow.py` that submits `{"fahrenheit": False}` for the Signals discovery and asserts it is stored.
 
+- [ ] **Step 2b: Per-field state flags (finding from `docs/captures/recon-2026-09-04-v4.21-probe1-fault.txt`)**
+
+A probe that is attached but faulted reports `573.0,2,81.0,0,77.3,0,0`: state `2` on the current temperature while max/min keep state `0`. Change `parse_temperatures` so each value honours its own state flag and "connected" means "not state 3":
+
+```python
+PROBE_FAULT_STATE = 2
+
+def _valid(fields: list[str], base: int, value_index: int, fahrenheit: bool) -> float | None:
+    """Return the value at value_index if its own state flag (value_index+1) is 0."""
+    if int(fields[base + value_index + 1]) != PROBE_ATTACHED_STATE:
+        return None
+    return _to_celsius(float(fields[base + value_index]), fahrenheit)
+
+
+def parse_temperatures(data: bytes, fahrenheit: bool) -> tuple[ProbeTemps, ...]:
+    """Parse the temperature characteristic into four ProbeTemps."""
+    fields = _fields(data, PROBE_COUNT * FIELDS_PER_PROBE, "temperatures")
+    probes: list[ProbeTemps] = []
+    for p in range(PROBE_COUNT):
+        base = p * FIELDS_PER_PROBE
+        connected = int(fields[base + _STATE_INDEX]) != NO_PROBE_STATE
+        if not connected:
+            probes.append(ProbeTemps(False, None, None, None))
+            continue
+        probes.append(
+            ProbeTemps(
+                connected=True,
+                temperature_c=_valid(fields, base, _TEMP_INDEX, fahrenheit),
+                max_c=_valid(fields, base, _MAX_INDEX, fahrenheit),
+                min_c=_valid(fields, base, _MIN_INDEX, fahrenheit),
+            )
+        )
+    return tuple(probes)
+```
+
+Add fixture `tests/fixtures/signals/capture-2026-09-v4.21-probe1-fault.json` (temperatures `"573.0,2,81.0,0,77.3,0,0,-63.0,3,-63.0,3,-63.0,3,0,-63.0,3,-63.0,3,-63.0,3,0,-63.0,3,-63.0,3,-63.0,3,0,"`, device info `"84,0,0,24:0a:c4:ec:2e:0e,v4.21,"`, other characteristics as in the `noprobe` fixture) and tests:
+
+```python
+class TestProbeFaultState:
+    def test_faulted_probe_is_connected_with_unknown_temperature(self) -> None:
+        chars = load_capture("capture-2026-09-v4.21-probe1-fault.json")
+        p1 = parse_temperatures(chars[UUID_TEMPERATURES], fahrenheit=True)[0]
+        assert p1.connected is True
+        assert p1.temperature_c is None
+        assert p1.max_c == pytest.approx(27.2, abs=0.05)   # 81.0F
+        assert p1.min_c == pytest.approx(25.2, abs=0.05)   # 77.3F
+
+    def test_alarm_state_with_unknown_temperature_is_not_alarming(self) -> None:
+        probe = ProbeTemps(connected=True, temperature_c=None, max_c=27.2, min_c=25.2)
+        assert alarm_state(probe, CFG) == (False, False)
+```
+
+`alarm_state` already returns `(False, False)` when `temperature_c is None`; confirm rather than change. Update the existing `test_fixture_empty_probes_are_disconnected_with_none` only if it fails (it should not: state 3 still yields the all-None `ProbeTemps`).
+
 - [ ] **Step 3: Resolve the `32` low-alarm question**
 
 If scenario 5 shows the low alarm value is arbitrary user data (e.g. `40` after setting 40), keep `alarm_state` as written. If `32` is a fixed "disabled" marker, change `alarm_state` so `low` is `False` when `cfg.alarm_low_c` equals the disabled sentinel, and add a parametrized test case.

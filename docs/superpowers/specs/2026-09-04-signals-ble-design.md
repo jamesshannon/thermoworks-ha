@@ -40,7 +40,7 @@ Sources: `wnoisephx/thermoworks-ble/Docs/Signals.txt` (Jan 2024) and a read-only
 
 | Purpose | UUID | 2026 example | Layout |
 |---|---|---|---|
-| Temperatures, all probes | `5F5F9010-0E0D-4BD4-B5DC-E4FF47A45984` (read, notify) | `-63.0,3,-63.0,3,-63.0,3,0,` ×4 (no probes); 2024 with probe: `71.4,0,71.7,0,70.2,0,0,…` | 7 fields per probe × 4 = 28 fields (+ trailing empty). Per probe at offset `p*7`: `[0]` current temp, `[1]` state, `[2]` session max, `[3]` state, `[4]` session min, `[5]` state, `[6]` `0`. State `0` = probe attached, `3` = no probe; temp reads `-63.0` when no probe. |
+| Temperatures, all probes | `5F5F9010-0E0D-4BD4-B5DC-E4FF47A45984` (read, notify) | `-63.0,3,-63.0,3,-63.0,3,0,` ×4 (no probes); 2024 with probe: `71.4,0,71.7,0,70.2,0,0,…` | 7 fields per probe × 4 = 28 fields (+ trailing empty). Per probe at offset `p*7`: `[0]` current temp, `[1]` its state, `[2]` session max, `[3]` its state, `[4]` session min, `[5]` its state, `[6]` `0`. **Each value has its own state flag.** State `0` = valid, `2` = fault/out-of-range (probe attached; observed `573.0,2,81.0,0,77.3,0` — current faulted while max/min stayed valid), `3` = no probe (`-63.0`). |
 | Probe 1 config | `0A990C1F-B61A-441C-8F7D-F775B6FF9400` (read, write, notify) | `360,225,0,Gril,0.0,` | `[0]` high alarm, `[1]` low alarm, `[2]` **flag, meaning unknown** (`0`/`1`; NOT a channel number — observed `0,1,1,0` across probes 1–4), `[3]` label (**device truncates to 4 chars**: `Gril`, `Roas`), `[4]` unknown (`0.0`) |
 | Probe 2 config | `F7C21D1C-5CB9-4B9B-AB7E-E1D8E7A51724` | `120,32,1,Roas,0.0,` | same |
 | Probe 3 config | `CFACB2D0-2D81-4C82-A168-13314E38A338` | `120,32,1,Roas,0.0,` | same |
@@ -62,7 +62,7 @@ One HA device per Signals, identified by BLE MAC. Entity keys are stable and do 
 | Key | Platform | Class / Unit | Source | Category |
 |---|---|---|---|---|
 | `probe_{n}_temperature` (n=1..4) | sensor | temperature, °C | temps `[p*7+0]`; **emitted as `None` when state ≠ 0** so HA shows `unknown` rather than −63 (HA's passive processor merges updates, so a key must be sent as `None` to clear it — omitting it would freeze the last value) | primary |
-| `probe_{n}_connected` | binary_sensor | connectivity | temps `[p*7+1] == 0` | primary |
+| `probe_{n}_connected` | binary_sensor | connectivity | temps `[p*7+1] != 3` (a faulted probe, state 2, is still physically connected; its temperature is `None`) | primary |
 | `probe_{n}_max`, `probe_{n}_min` | sensor | temperature, °C | temps `[+2]`, `[+4]`; `None` when no probe | diagnostic |
 | `probe_{n}_alarm_high_setpoint`, `probe_{n}_alarm_low_setpoint` | sensor | temperature, °C | probe-config `[0]`, `[1]` | diagnostic |
 | `probe_{n}_alarm_high` | binary_sensor | problem | **derived in driver:** `connected and temp >= high_setpoint` | primary — the automation hook |
