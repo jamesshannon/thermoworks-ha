@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -317,3 +318,72 @@ class TestSignalsDeviceApply:
             for key in ("connected", "alarm_high", "alarm_low"):
                 assert f"probe_{n}_{key}" in binaries
         assert "battery" in sensors and "wifi_connected" in binaries
+
+
+class FakeClient:
+    """Minimal BleakClient stand-in keyed by lowercase UUID."""
+
+    def __init__(self, responses: dict[str, bytes | Exception], delay: float = 0.0):
+        self.responses = responses
+        self.delay = delay
+        self.reads: list[str] = []
+
+    async def read_gatt_char(self, uuid):
+        uuid = str(uuid).lower()
+        self.reads.append(uuid)
+        if self.delay:
+            await asyncio.sleep(self.delay)
+        value = self.responses[uuid]
+        if isinstance(value, Exception):
+            raise value
+        return bytearray(value)
+
+
+class TestSignalsAsyncRead:
+    @pytest.mark.asyncio
+    async def test_full_read_from_fixture(self, capture) -> None:
+        client = FakeClient(capture)
+        reading = await SignalsDevice().async_read(client, timeout=1.0)
+        assert reading.probes[0].connected is True
+        assert reading.configs[3].flag == 1
+        assert reading.info.firmware == "v4.21"
+        assert reading.wifi.connected is True
+
+    @pytest.mark.asyncio
+    async def test_reads_device_info_before_temperatures(self, capture) -> None:
+        client = FakeClient(capture)
+        await SignalsDevice().async_read(client, timeout=1.0)
+        assert (
+            client.reads.index(UUID_DEVICE_INFO)
+            < client.reads.index(UUID_TEMPERATURES)
+        )
+
+    @pytest.mark.asyncio
+    async def test_temperature_read_failure_raises(self, capture) -> None:
+        capture[UUID_TEMPERATURES] = RuntimeError("boom")
+        with pytest.raises(RuntimeError):
+            await SignalsDevice().async_read(FakeClient(capture), timeout=1.0)
+
+    @pytest.mark.asyncio
+    async def test_temperature_parse_failure_raises(self, capture) -> None:
+        capture[UUID_TEMPERATURES] = b"garbage"
+        with pytest.raises(ValueError):
+            await SignalsDevice().async_read(FakeClient(capture), timeout=1.0)
+
+    @pytest.mark.asyncio
+    async def test_optional_read_failures_degrade_to_none(self, capture) -> None:
+        capture[UUID_DEVICE_INFO] = RuntimeError("boom")
+        capture[UUID_WIFI] = b"bad"
+        capture[UUID_PROBE_CONFIG[1]] = RuntimeError("boom")
+        reading = await SignalsDevice().async_read(FakeClient(capture), timeout=1.0)
+        assert reading.info is None
+        assert reading.wifi is None
+        assert reading.configs[0] is not None
+        assert reading.configs[1] is None
+
+    @pytest.mark.asyncio
+    async def test_read_timeout_raises(self, capture) -> None:
+        with pytest.raises(asyncio.TimeoutError):
+            await SignalsDevice().async_read(
+                FakeClient(capture, delay=0.2), timeout=0.05
+            )

@@ -97,3 +97,29 @@ class TestBlueDOTDevice:
         assert temps["temperature"] == 30.0
         assert binaries["probe_connected"] is True
         assert binaries["alarm_active"] is True
+
+
+class TestDriverRegistry:
+    def test_signals_name_returns_signals_driver(self) -> None:
+        from custom_components.thermoworks_bt.ble.signals import SignalsDevice
+
+        assert isinstance(driver_for("TMW022"), SignalsDevice)
+
+    def test_signals_driver_receives_fahrenheit_option(self) -> None:
+        driver = driver_for("TMW022", fahrenheit=False)
+        assert driver.fahrenheit is False
+
+    def test_exports(self) -> None:
+        from custom_components.thermoworks_bt import ble
+
+        for name in ("DeviceDriver", "driver_for", "all_drivers", "BlueDOTDevice",
+                     "SignalsDevice", "SignalsReading", "is_signals",
+                     "ThermoWorksBluetoothDeviceData"):
+            assert name in ble.__all__, name
+
+    def test_all_drivers_order(self) -> None:
+        from custom_components.thermoworks_bt.ble.bluedot import BlueDOTDevice
+        from custom_components.thermoworks_bt.ble.device import all_drivers
+        from custom_components.thermoworks_bt.ble.signals import SignalsDevice
+
+        assert all_drivers() == (BlueDOTDevice, SignalsDevice)

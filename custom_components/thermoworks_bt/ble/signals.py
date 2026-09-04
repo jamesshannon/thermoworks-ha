@@ -8,9 +8,11 @@ connection; the advertisement carries no sensor data. Protocol reference:
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 from sensor_state_data import (
     BinarySensorDeviceClass,
@@ -26,6 +28,8 @@ if TYPE_CHECKING:
     from bleak import BleakClient
 
 _LOGGER = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 DEVICE_NAME_PREFIX = "TMW022"
 
@@ -227,8 +231,55 @@ class SignalsDevice(DeviceDriver):
     async def async_read(
         self, client: BleakClient, *, timeout: float
     ) -> SignalsReading:
-        """Read one full poll from the connected client."""
-        raise NotImplementedError("implemented in Task 5")
+        """Read all characteristics inside one connection.
+
+        Device info is read first so a unit flag (if one is ever located there)
+        is known before temperatures are parsed. Temperature failures propagate;
+        every other read degrades to None for that part of the reading.
+        """
+        info = await self._read_optional(
+            client, UUID_DEVICE_INFO, parse_device_info, timeout, "device info"
+        )
+        fahrenheit = self.fahrenheit
+
+        raw = await asyncio.wait_for(client.read_gatt_char(UUID_TEMPERATURES), timeout)
+        _LOGGER.debug("temperatures: %s", bytes(raw))
+        probes = parse_temperatures(bytes(raw), fahrenheit)
+
+        wifi = await self._read_optional(client, UUID_WIFI, parse_wifi, timeout, "wifi")
+        configs = tuple(
+            [
+                await self._read_optional(
+                    client, uuid, lambda b: parse_probe_config(b, fahrenheit),
+                    timeout, f"probe {n} config",
+                )
+                for n, uuid in enumerate(UUID_PROBE_CONFIG, start=1)
+            ]
+        )
+        return SignalsReading(probes=probes, configs=configs, info=info, wifi=wifi)
+
+    @staticmethod
+    async def _read_optional(
+        client: BleakClient,
+        uuid: str,
+        parse: Callable[[bytes], T],
+        timeout: float,
+        what: str,
+    ) -> T | None:
+        """Read + parse one characteristic; None on any failure except timeout."""
+        try:
+            raw = await asyncio.wait_for(client.read_gatt_char(uuid), timeout)
+        except asyncio.TimeoutError:
+            raise
+        except Exception as err:  # noqa: BLE001 - degrade, do not fail the poll
+            _LOGGER.debug("Signals %s read failed: %s", what, err)
+            return None
+        _LOGGER.debug("%s: %s", what, bytes(raw))
+        try:
+            return parse(bytes(raw))
+        except ValueError as err:
+            _LOGGER.debug("Signals %s parse failed: %s", what, err)
+            return None
 
     def apply(self, reading: SignalsReading, data: SensorData) -> None:
         """Translate a Signals reading into sensor/binary-sensor keys on ``data``."""

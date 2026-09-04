@@ -62,8 +62,9 @@ def all_drivers() -> tuple[type[DeviceDriver], ...]:
     imported lazily here rather than at module load to avoid a circular import.
     """
     from .bluedot import BlueDOTDevice
+    from .signals import SignalsDevice
 
-    return (BlueDOTDevice,)
+    return (BlueDOTDevice, SignalsDevice)
 
 
 def driver_for(local_name: str | None, **options: Any) -> DeviceDriver | None:
