@@ -5,6 +5,10 @@
     {
       "local_name": "BlueDOT*",
       "connectable": true
+    },
+    {
+      "local_name": "TMW022*",
+      "connectable": true
     }
   ],
   "codeowners": ["@jamesshannon"],

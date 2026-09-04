@@ -41,3 +41,10 @@ NOT_THERMOWORKS_SERVICE_INFO = _make_bluetooth_service_info(
     address="AA:BB:CC:DD:EE:FF",
     rssi=-70,
 )
+
+SIGNALS_SERVICE_INFO = _make_bluetooth_service_info(
+    name="TMW022",
+    address="24:62:AB:E0:C1:BE",
+    rssi=-66,
+    manufacturer_data={25124: b"\xab\xe0\xc1\xbe"},
+)

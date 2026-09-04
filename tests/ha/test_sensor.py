@@ -88,3 +88,19 @@ async def test_sensor_unit_is_celsius(
     temp_entity = hass.states.get("sensor.bluedot_temperature")
     if temp_entity:
         assert temp_entity.attributes.get("unit_of_measurement") == UnitOfTemperature.CELSIUS
+
+
+async def test_signals_entry_loads(hass: HomeAssistant) -> None:
+    """Test that a Signals config entry sets up and loads."""
+    entry = MockConfigEntry(
+        domain=DOMAIN, unique_id="24:62:AB:E0:C1:BE", title="Signals C1BE", data={}
+    )
+    entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.thermoworks_bt.coordinator.ThermoWorksCoordinator.async_start"
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert entry.state.name == "LOADED"
