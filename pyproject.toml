@@ -1,6 +1,6 @@
 [project]
 name = "thermoworks-ha"
-version = "0.1.0"
+version = "0.10.0"
 description = "Home Assistant custom component for ThermoWorks Bluetooth thermometers"
 requires-python = ">=3.12"
 

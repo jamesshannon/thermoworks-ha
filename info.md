@@ -5,6 +5,7 @@ Integrate your ThermoWorks Bluetooth thermometers with Home Assistant.
 ## Supported Devices
 
 - **BlueDOT** - Bluetooth thermometer with probe and alarm functionality
+- **Signals** - 4-channel thermometer (read-only; device must be set to °F)
 
 ## Key Features
 
@@ -30,6 +31,8 @@ Integrate your ThermoWorks Bluetooth thermometers with Home Assistant.
 5. Select your device
 
 The integration will automatically discover your device and create temperature, probe status, and alarm sensors.
+
+Signals alarms are computed by Home Assistant from the device's setpoints (low alarms read *on* from a cold start); close the ThermoWorks app while Home Assistant is polling.
 
 ## Technical Details
 
