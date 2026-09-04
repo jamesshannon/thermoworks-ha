@@ -230,9 +230,9 @@ class TestProbeFaultState:
         assert p1.max_c == pytest.approx(27.2, abs=0.05)  # 81.0F
         assert p1.min_c == pytest.approx(25.2, abs=0.05)  # 77.3F
 
-    def test_alarm_state_with_unknown_temperature_is_not_alarming(self) -> None:
+    def test_alarm_state_with_unknown_temperature_is_unknown(self) -> None:
         probe = ProbeTemps(connected=True, temperature_c=None, max_c=27.2, min_c=25.2)
-        assert alarm_state(probe, CFG) == (False, False)
+        assert alarm_state(probe, CFG) == (None, None)
 
 
 ATTACHED = ProbeTemps(connected=True, temperature_c=90.0, max_c=95.0, min_c=20.0)

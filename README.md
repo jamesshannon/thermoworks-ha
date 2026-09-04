@@ -63,7 +63,7 @@ For Signals, per probe (1–4): **Temperature**, **Probe** (connected), **High A
 Signals caveats (v1):
 - **Units:** Signals sends temperatures in its display unit with no unit marker; this integration assumes the unit is set to **°F**. If you switch the device to °C, every reported temperature will be off by the F→C transform (it is obvious in Home Assistant). Home Assistant itself displays in your configured unit system either way.
 - **Low alarm:** the ThermoWorks app only arms a low alarm after the temperature has first risen above the setpoint; the Home Assistant binary sensor is a plain comparison, so a pit channel with a 225 °F low setpoint reads *on* from a cold start. Automations that care should also check that the probe's Session Max has exceeded the setpoint.
-- **Faulted probe:** an attached probe reporting a fault (device state 2) shows *Probe* on with an *unknown* temperature.
+- **Faulted probe:** an attached probe reporting a fault (device state 2) shows *Probe* on with an *unknown* temperature and *unknown* alarm states.
 - **Polling only:** the device advertises notifications but refuses to enable them without the app's handshake, so the integration reads every 30 s over an active connection (ESP32/ESPHome proxies with `active: true`, or a local adapter). Close the ThermoWorks phone app — it holds the only BLE connection.
 - **Battery** is read from a device-info field that is provisional; while charging it fluctuates.
 

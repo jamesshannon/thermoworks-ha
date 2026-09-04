@@ -199,12 +199,16 @@ def alarm_state(
     """Return (high_alarm, low_alarm), computed in HA from setpoints.
 
     The device exposes setpoints but no alarm flag on the read side. A
-    disconnected probe never alarms; a missing config makes the state unknown.
+    disconnected probe never alarms; a connected probe whose temperature is
+    unknown (fault) has unknown alarm state; a missing config makes the
+    state unknown.
     """
     if cfg is None:
         return (None, None)
-    if not probe.connected or probe.temperature_c is None:
+    if not probe.connected:
         return (False, False)
+    if probe.temperature_c is None:
+        return (None, None)
     high = cfg.alarm_high_c is not None and probe.temperature_c >= cfg.alarm_high_c
     low = cfg.alarm_low_c is not None and probe.temperature_c <= cfg.alarm_low_c
     return (high, low)
