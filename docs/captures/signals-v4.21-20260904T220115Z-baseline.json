@@ -1,7 +1,7 @@
 {
   "captured": "2026-09-04T22:00:47+00:00",
   "scenario": "baseline",
-  "address": "24:0A:C4:EC:2E:0E",
+  "address": "24:0A:C4:00:00:01",
   "services": [
     {
       "uuid": "00001801-0000-1000-8000-00805f9b34fb",
@@ -255,8 +255,8 @@
         "read"
       ],
       "service": "0000a002-0000-1000-8000-00805f9b34fb",
-      "hex": "38342c302c302c32343a30613a63343a65633a32653a30652c76342e32312c",
-      "ascii": "84,0,0,24:0a:c4:ec:2e:0e,v4.21,"
+      "hex": "38342c302c302c32343a30613a63343a30303a30303a30312c76342e32312c",
+      "ascii": "84,0,0,24:0a:c4:00:00:01,v4.21,"
     },
     "7633f5bb-d0c6-478b-b031-d3a0d70c2a7e": {
       "properties": [
@@ -295,8 +295,8 @@
         "write"
       ],
       "service": "0000a002-0000-1000-8000-00805f9b34fb",
-      "hex": "4d6f324e65742c312c696f74736572766963652e746865726d6f776f726b732e636f6d2c31",
-      "ascii": "Mo2Net,1,iotservice.thermoworks.com,1"
+      "hex": "4d79576966692c312c696f74736572766963652e746865726d6f776f726b732e636f6d2c31",
+      "ascii": "MyWifi,1,iotservice.thermoworks.com,1"
     },
     "db28403a-a7e1-4c2a-a109-a52913f50cc9": {
       "properties": [

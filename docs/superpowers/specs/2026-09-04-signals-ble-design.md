@@ -45,8 +45,8 @@ Sources: `wnoisephx/thermoworks-ble/Docs/Signals.txt` (Jan 2024) and a read-only
 | Probe 2 config | `F7C21D1C-5CB9-4B9B-AB7E-E1D8E7A51724` | `120,32,1,Roas,0.0,` | same |
 | Probe 3 config | `CFACB2D0-2D81-4C82-A168-13314E38A338` | `120,32,1,Roas,0.0,` | same |
 | Probe 4 config | `C99C943F-DA4B-4EE3-92EC-C806006E9E7F` | `160,32,0,CH 4,0.0,225,0` (2024: `160,32,1,CH 4,0,0,255,0`) | same, plus trailing `<n>,0` — `225` strongly suggests the pit/Billows target for channel 4; unused in v1 |
-| Device info | `3CE0C366-691F-43E6-B625-3F0912FF6EA7` (read, notify) | `66,0,0,24:0a:c4:ec:2e:0e,v4.21,` (2024: `100,67,0,…,v4.21`) | `[0]` **battery % (provisional** — 2024 notes guessed `[1]`, but `[1]` reads `0` on a running unit), `[1]` unknown, `[2]` unknown, `[3]` MAC, `[4]` firmware. Phase 1 confirms by comparing `[0]` with the app's battery display. |
-| WiFi | `B4F1D66A-ECAB-4E03-8B43-B9DF904EBCDF` (read, write, notify) | `Mo2Net,1,iotservice.thermoworks.com,1` | `[0]` SSID, `[1]` flag (1 = connected?), `[2]` cloud host, `[3]` flag |
+| Device info | `3CE0C366-691F-43E6-B625-3F0912FF6EA7` (read, notify) | `66,0,0,24:0a:c4:00:00:01,v4.21,` (2024: `100,67,0,…,v4.21`; MAC redacted) | `[0]` **battery % (provisional** — 2024 notes guessed `[1]`, but `[1]` reads `0` on a running unit), `[1]` unknown, `[2]` unknown, `[3]` MAC, `[4]` firmware. Phase 1 confirms by comparing `[0]` with the app's battery display. |
+| WiFi | `B4F1D66A-ECAB-4E03-8B43-B9DF904EBCDF` (read, write, notify) | `MyWifi,1,iotservice.thermoworks.com,1` (SSID redacted) | `[0]` SSID, `[1]` flag (1 = connected?), `[2]` cloud host, `[3]` flag |
 | Unknown ×6 | `7633F5BB-…` (`1`), `01817E20-…`, `E6DB3978-…`, `DB28403A-…`, `E32E526F-…`, `90BC0C13-…` (all `\x00`) | read, write, notify | Presumed settings/command side (units, alarm arming, Billows). `7633F5BB` = `1` in both captures — candidate unit flag. **Never written in v1.** |
 | Unknown | `4E8A02FE-BB42-452D-B573-E0645F03C230` | write, notify only | Command channel. **Never written in v1.** |
 | Generic | `00002a00` in service `a002` | read, write | `'0'` — unknown |

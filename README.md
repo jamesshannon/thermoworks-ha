@@ -1,7 +1,7 @@
 # ThermoWorks Bluetooth Integration for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
-[![Validate](https://github.com/jamesshannon/thermoworks-ha/actions/workflows/validate.yaml/badge.svg)](https://github.com/jamesshannon/thermoworks-ha/actions/workflows/validate.yaml)
+[![Validate](https://github.com/sjmotew/thermoworks-ha/actions/workflows/validate.yaml/badge.svg)](https://github.com/sjmotew/thermoworks-ha/actions/workflows/validate.yaml)
 
 Home Assistant custom integration for ThermoWorks Bluetooth thermometers.
 
@@ -132,6 +132,6 @@ Contributions are welcome! Please:
 
 ## Support
 
-- 🐛 [Report bugs](https://github.com/jamesshannon/thermoworks-ha/issues)
-- 💡 [Request features](https://github.com/jamesshannon/thermoworks-ha/issues)
-- 📖 [Documentation](https://github.com/jamesshannon/thermoworks-ha)
+- 🐛 [Report bugs](https://github.com/sjmotew/thermoworks-ha/issues)
+- 💡 [Request features](https://github.com/sjmotew/thermoworks-ha/issues)
+- 📖 [Documentation](https://github.com/sjmotew/thermoworks-ha)

@@ -179,11 +179,11 @@ class TestCapture2026:
     def test_device_info_battery_is_field_0(self, capture26) -> None:
         info = parse_device_info(capture26[UUID_DEVICE_INFO])
         assert info.battery_pct == 66
-        assert info.mac == "24:0a:c4:ec:2e:0e"
+        assert info.mac == "24:0a:c4:00:00:01"
         assert info.firmware == "v4.21"
 
     def test_wifi(self, capture26) -> None:
-        assert parse_wifi(capture26[UUID_WIFI]).ssid == "Mo2Net"
+        assert parse_wifi(capture26[UUID_WIFI]).ssid == "MyWifi"
 
 
 class TestParseWifi:

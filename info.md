@@ -42,4 +42,4 @@ Uses Home Assistant's native Bluetooth integration with:
 - Local processing (no cloud required)
 - Efficient connection management
 
-For more details, see the [README](https://github.com/jamesshannon/thermoworks-ha).
+For more details, see the [README](https://github.com/sjmotew/thermoworks-ha).
