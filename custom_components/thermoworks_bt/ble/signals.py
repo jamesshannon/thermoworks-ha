@@ -8,7 +8,24 @@ connection; the advertisement carries no sensor data. Protocol reference:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from sensor_state_data import (
+    BinarySensorDeviceClass,
+    SensorData,
+    SensorDeviceClass,
+    SensorLibrary,
+    Units,
+)
+
+from .device import DeviceDriver
+
+if TYPE_CHECKING:
+    from bleak import BleakClient
+
+_LOGGER = logging.getLogger(__name__)
 
 DEVICE_NAME_PREFIX = "TMW022"
 
@@ -152,3 +169,141 @@ def parse_wifi(data: bytes) -> WifiInfo:
         connected=fields[1].strip() == "1",
         cloud_host=fields[2].strip() if len(fields) > 2 else "",
     )
+
+
+@dataclass(frozen=True, slots=True)
+class SignalsReading:
+    """One full poll of a Signals unit. Optional parts are None if their read failed."""
+
+    probes: tuple[ProbeTemps, ...]
+    configs: tuple[ProbeConfig | None, ...]
+    info: DeviceInfo | None
+    wifi: WifiInfo | None
+
+
+def alarm_state(
+    probe: ProbeTemps, cfg: ProbeConfig | None
+) -> tuple[bool | None, bool | None]:
+    """Return (high_alarm, low_alarm), computed in HA from setpoints.
+
+    The device exposes setpoints but no alarm flag on the read side. A
+    disconnected probe never alarms; a missing config makes the state unknown.
+    """
+    if cfg is None:
+        return (None, None)
+    if not probe.connected or probe.temperature_c is None:
+        return (False, False)
+    high = cfg.alarm_high_c is not None and probe.temperature_c >= cfg.alarm_high_c
+    low = cfg.alarm_low_c is not None and probe.temperature_c <= cfg.alarm_low_c
+    return (high, low)
+
+
+class SignalsDevice(DeviceDriver):
+    """Driver for the ThermoWorks Signals 4-channel thermometer (read-only)."""
+
+    device_type = "Signals"
+    min_poll_interval = 30.0
+
+    def __init__(self, fahrenheit: bool = True, **options: object) -> None:
+        """Create the driver.
+
+        Args:
+            fahrenheit: Assumed device display unit until a unit flag is located
+                (see docs/protocol/signals-ble.md, "Open questions").
+        """
+        super().__init__(fahrenheit=fahrenheit, **options)
+        self.fahrenheit = fahrenheit
+
+    @classmethod
+    def matches(cls, local_name: str | None) -> bool:
+        """Return True if the advertised local name identifies a Signals unit."""
+        return is_signals(local_name)
+
+    def device_name(self, local_name: str | None, address: str) -> str:
+        """Return the name shown in Home Assistant, using the MAC's last 4 hex chars."""
+        suffix = address.replace(":", "").replace("-", "")[-4:].upper()
+        return f"Signals {suffix}"
+
+    async def async_read(
+        self, client: BleakClient, *, timeout: float
+    ) -> SignalsReading:
+        """Read one full poll from the connected client."""
+        raise NotImplementedError("implemented in Task 5")
+
+    def apply(self, reading: SignalsReading, data: SensorData) -> None:
+        """Translate a Signals reading into sensor/binary-sensor keys on ``data``."""
+        for n, probe in enumerate(reading.probes, start=1):
+            cfg = reading.configs[n - 1] if n - 1 < len(reading.configs) else None
+            high, low = alarm_state(probe, cfg)
+            self._temp(
+                data, f"probe_{n}_temperature", f"Probe {n} Temperature",
+                probe.temperature_c,
+            )
+            self._temp(
+                data, f"probe_{n}_max", f"Probe {n} Session Max", probe.max_c
+            )
+            self._temp(
+                data, f"probe_{n}_min", f"Probe {n} Session Min", probe.min_c
+            )
+            self._temp(
+                data, f"probe_{n}_alarm_high_setpoint",
+                f"Probe {n} High Alarm Setpoint",
+                cfg.alarm_high_c if cfg else None,
+            )
+            self._temp(
+                data, f"probe_{n}_alarm_low_setpoint",
+                f"Probe {n} Low Alarm Setpoint",
+                cfg.alarm_low_c if cfg else None,
+            )
+            data.update_sensor(
+                key=f"probe_{n}_channel_label",
+                native_unit_of_measurement=None,
+                native_value=cfg.label if cfg else None,
+                name=f"Probe {n} Channel Label",
+            )
+            data.update_binary_sensor(
+                key=f"probe_{n}_connected",
+                native_value=probe.connected,
+                device_class=BinarySensorDeviceClass.CONNECTIVITY,
+                name=f"Probe {n}",
+            )
+            data.update_binary_sensor(
+                key=f"probe_{n}_alarm_high",
+                native_value=high,
+                device_class=BinarySensorDeviceClass.PROBLEM,
+                name=f"Probe {n} High Alarm",
+            )
+            data.update_binary_sensor(
+                key=f"probe_{n}_alarm_low",
+                native_value=low,
+                device_class=BinarySensorDeviceClass.PROBLEM,
+                name=f"Probe {n} Low Alarm",
+            )
+
+        info = reading.info
+        data.update_predefined_sensor(
+            SensorLibrary.BATTERY__PERCENTAGE,
+            info.battery_pct if info else None,
+            key="battery",
+            name="Battery",
+        )
+        if info:
+            data.set_device_sw_version(info.firmware)
+
+        data.update_binary_sensor(
+            key="wifi_connected",
+            native_value=reading.wifi.connected if reading.wifi else None,
+            device_class=BinarySensorDeviceClass.CONNECTIVITY,
+            name="WiFi",
+        )
+
+    @staticmethod
+    def _temp(data: SensorData, key: str, name: str, value: float | None) -> None:
+        """Emit one temperature sensor in native Celsius."""
+        data.update_sensor(
+            key=key,
+            native_unit_of_measurement=Units.TEMP_CELSIUS,
+            native_value=value,
+            device_class=SensorDeviceClass.TEMPERATURE,
+            name=name,
+        )

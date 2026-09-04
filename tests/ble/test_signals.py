@@ -6,14 +6,20 @@ import json
 from pathlib import Path
 
 import pytest
+from sensor_state_data import SensorData
 
 from custom_components.thermoworks_bt.ble.signals import (
     UUID_DEVICE_INFO,
     UUID_PROBE_CONFIG,
     UUID_TEMPERATURES,
     UUID_WIFI,
+    DeviceInfo,
+    ProbeConfig,
     ProbeTemps,
+    SignalsDevice,
+    SignalsReading,
     WifiInfo,
+    alarm_state,
     is_signals,
     parse_device_info,
     parse_probe_config,
@@ -191,3 +197,123 @@ class TestParseWifi:
     def test_too_few_fields_raises(self) -> None:
         with pytest.raises(ValueError, match="expected at least 2 fields"):
             parse_wifi(b"MyWifi")
+
+
+ATTACHED = ProbeTemps(connected=True, temperature_c=90.0, max_c=95.0, min_c=20.0)
+EMPTY = ProbeTemps(connected=False, temperature_c=None, max_c=None, min_c=None)
+CFG = ProbeConfig(alarm_high_c=93.0, alarm_low_c=60.0, flag=1, label="CH 1")
+
+
+class TestAlarmState:
+    @pytest.mark.parametrize(
+        ("temp", "expected"),
+        [
+            (92.9, (False, False)),
+            (93.0, (True, False)),
+            (60.0, (False, True)),
+            (59.0, (False, True)),
+        ],
+    )
+    def test_thresholds_inclusive(self, temp, expected) -> None:
+        probe = ProbeTemps(connected=True, temperature_c=temp, max_c=temp, min_c=temp)
+        assert alarm_state(probe, CFG) == expected
+
+    def test_disconnected_probe_is_not_alarming(self) -> None:
+        assert alarm_state(EMPTY, CFG) == (False, False)
+
+    def test_missing_config_is_unknown(self) -> None:
+        assert alarm_state(ATTACHED, None) == (None, None)
+
+
+def _reading(**overrides) -> SignalsReading:
+    base = dict(
+        probes=(ATTACHED, EMPTY, EMPTY, EMPTY),
+        configs=(CFG, CFG, CFG, CFG),
+        info=DeviceInfo(
+            battery_pct=67, mac="24:62:ab:e0:c1:be", firmware="v4.21", raw_fields=()
+        ),
+        wifi=WifiInfo(ssid="x", connected=True, cloud_host="h"),
+    )
+    base.update(overrides)
+    return SignalsReading(**base)
+
+
+def _apply(reading: SignalsReading):
+    data = SensorData()
+    SignalsDevice().apply(reading, data)
+    update = data._finish_update()
+    sensors = {k.key: v.native_value for k, v in update.entity_values.items()}
+    binaries = {
+        k.key: v.native_value for k, v in update.binary_entity_values.items()
+    }
+    return sensors, binaries, update
+
+
+class TestSignalsDeviceApply:
+    def test_class_attributes_and_matching(self) -> None:
+        assert SignalsDevice.device_type == "Signals"
+        assert SignalsDevice.min_poll_interval == 30.0
+        assert SignalsDevice.matches("TMW022") is True
+        assert SignalsDevice.matches("BlueDOT") is False
+
+    def test_device_name_uses_mac_suffix(self) -> None:
+        assert (
+            SignalsDevice().device_name("TMW022", "24:62:AB:E0:C1:BE")
+            == "Signals C1BE"
+        )
+
+    def test_attached_probe_emits_values(self) -> None:
+        sensors, binaries, _ = _apply(_reading())
+        assert sensors["probe_1_temperature"] == 90.0
+        assert sensors["probe_1_max"] == 95.0
+        assert sensors["probe_1_min"] == 20.0
+        assert sensors["probe_1_alarm_high_setpoint"] == 93.0
+        assert sensors["probe_1_alarm_low_setpoint"] == 60.0
+        assert sensors["probe_1_channel_label"] == "CH 1"
+        assert binaries["probe_1_connected"] is True
+        assert binaries["probe_1_alarm_high"] is False
+        assert binaries["probe_1_alarm_low"] is False
+
+    def test_empty_probe_emits_none_not_missing(self) -> None:
+        sensors, binaries, _ = _apply(_reading())
+        assert "probe_2_temperature" in sensors
+        assert sensors["probe_2_temperature"] is None
+        assert sensors["probe_2_max"] is None
+        assert binaries["probe_2_connected"] is False
+        assert binaries["probe_2_alarm_high"] is False
+
+    def test_missing_config_emits_none(self) -> None:
+        sensors, binaries, _ = _apply(_reading(configs=(None, CFG, CFG, CFG)))
+        assert sensors["probe_1_alarm_high_setpoint"] is None
+        assert sensors["probe_1_channel_label"] is None
+        assert binaries["probe_1_alarm_high"] is None
+
+    def test_missing_info_and_wifi_emit_none(self) -> None:
+        sensors, binaries, _ = _apply(_reading(info=None, wifi=None))
+        assert sensors["battery"] is None
+        assert binaries["wifi_connected"] is None
+
+    def test_battery_and_wifi_and_firmware(self) -> None:
+        sensors, binaries, update = _apply(_reading())
+        assert sensors["battery"] == 67
+        assert binaries["wifi_connected"] is True
+        device = next(iter(update.devices.values()))
+        assert device.sw_version == "v4.21"
+
+    def test_all_keys_always_present(self) -> None:
+        sensors, binaries, _ = _apply(
+            _reading(configs=(None,) * 4, info=None, wifi=None)
+        )
+        for n in range(1, 5):
+            for key in (
+                "temperature",
+                "max",
+                "min",
+                "alarm_high_setpoint",
+                "alarm_low_setpoint",
+                "channel_label",
+            ):
+                assert f"probe_{n}_{key}" in sensors
+            for key in ("connected", "alarm_high", "alarm_low"):
+                assert f"probe_{n}_{key}" in binaries
+        assert "battery" in sensors and "wifi_connected" in binaries
