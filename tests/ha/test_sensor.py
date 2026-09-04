@@ -5,15 +5,12 @@ from __future__ import annotations
 import struct
 from unittest.mock import patch
 
-from homeassistant.core import HomeAssistant
 from homeassistant.const import UnitOfTemperature
-
+from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.thermoworks_bt.ble.bluedot import NOTIFICATION_DATA_LENGTH
 from custom_components.thermoworks_bt.const import DOMAIN
-
-from . import BLUEDOT_SERVICE_INFO
 
 
 def _build_notification_payload(temperature: int = 25, unit: int = 0x00) -> bytearray:
@@ -61,7 +58,7 @@ async def test_sensors_created_from_poll(
 async def test_sensor_unit_is_celsius(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
-    """Test that temperature sensor always reports in Celsius regardless of device setting."""
+    """Test that temperature sensor always reports Celsius regardless of device unit."""
     mock_config_entry.add_to_hass(hass)
     # Device set to Fahrenheit, 72F = 22.2C
     payload = _build_notification_payload(temperature=72, unit=0x01)
@@ -87,7 +84,10 @@ async def test_sensor_unit_is_celsius(
     # If sensor entities were registered, verify unit.
     temp_entity = hass.states.get("sensor.bluedot_temperature")
     if temp_entity:
-        assert temp_entity.attributes.get("unit_of_measurement") == UnitOfTemperature.CELSIUS
+        assert (
+            temp_entity.attributes.get("unit_of_measurement")
+            == UnitOfTemperature.CELSIUS
+        )
 
 
 async def test_signals_entry_loads(hass: HomeAssistant) -> None:
@@ -104,3 +104,61 @@ async def test_signals_entry_loads(hass: HomeAssistant) -> None:
         await hass.async_block_till_done()
 
     assert entry.state.name == "LOADED"
+
+
+def test_signals_keys_all_resolve_to_descriptions() -> None:
+    """Every key SignalsDevice.apply emits must map to an HA entity description."""
+    from homeassistant.const import EntityCategory
+    from sensor_state_data import SensorData
+
+    from custom_components.thermoworks_bt.binary_sensor import (
+        binary_sensor_update_to_bluetooth_data_update,
+    )
+    from custom_components.thermoworks_bt.ble.signals import (
+        DeviceInfo,
+        ProbeConfig,
+        ProbeTemps,
+        SignalsDevice,
+        SignalsReading,
+        WifiInfo,
+    )
+    from custom_components.thermoworks_bt.sensor import (
+        sensor_update_to_bluetooth_data_update,
+    )
+
+    probe = ProbeTemps(connected=True, temperature_c=90.0, max_c=95.0, min_c=20.0)
+    cfg = ProbeConfig(alarm_high_c=93.0, alarm_low_c=60.0, flag=1, label="CH 1")
+    reading = SignalsReading(
+        probes=(probe,) * 4,
+        configs=(cfg,) * 4,
+        info=DeviceInfo(
+            battery_pct=67, mac="aa:bb:cc:dd:ee:ff", firmware="v4.21", raw_fields=()
+        ),
+        wifi=WifiInfo(ssid="MyWifi", connected=True, cloud_host="h"),
+    )
+    data = SensorData()
+    data.set_device_name("Signals TEST")
+    SignalsDevice().apply(reading, data)
+    update = data._finish_update()
+
+    sensors = sensor_update_to_bluetooth_data_update(update)
+    binaries = binary_sensor_update_to_bluetooth_data_update(update)
+
+    emitted_sensor_keys = {k.key for k in update.entity_values}
+    emitted_binary_keys = {k.key for k in update.binary_entity_values}
+    assert {k.key for k in sensors.entity_descriptions} == emitted_sensor_keys
+    assert {k.key for k in binaries.entity_descriptions} == emitted_binary_keys
+
+    diagnostic = {
+        f"probe_{n}_{s}"
+        for n in range(1, 5)
+        for s in (
+            "max", "min", "alarm_high_setpoint", "alarm_low_setpoint", "channel_label"
+        )
+    } | {"battery"}
+    for key, description in sensors.entity_descriptions.items():
+        expected = EntityCategory.DIAGNOSTIC if key.key in diagnostic else None
+        assert description.entity_category == expected, key.key
+    wifi = next(k for k in binaries.entity_descriptions if k.key == "wifi_connected")
+    wifi_description = binaries.entity_descriptions[wifi]
+    assert wifi_description.entity_category == EntityCategory.DIAGNOSTIC
