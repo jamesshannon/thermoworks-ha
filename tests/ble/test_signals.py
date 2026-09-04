@@ -38,8 +38,10 @@ def load_capture(name: str = "capture-2024-01-v4.21.json") -> dict[str, bytes]:
     for uuid, entry in doc["characteristics"].items():
         if "hex" in entry:
             out[uuid.lower()] = bytes.fromhex(entry["hex"])
-        else:
+        elif "ascii" in entry:
             out[uuid.lower()] = entry["ascii"].encode("ascii")
+        # else: no readable value captured (e.g. write-only or errored read) —
+        # skip, dump-script fixtures carry these alongside ThermoWorks UUIDs.
     return out
 
 
@@ -198,6 +200,39 @@ class TestParseWifi:
     def test_too_few_fields_raises(self) -> None:
         with pytest.raises(ValueError, match="expected at least 2 fields"):
             parse_wifi(b"MyWifi")
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "capture-2024-01-v4.21.json",
+        "capture-2026-09-v4.21-noprobe.json",
+        "capture-2026-09-v4.21-baseline.json",
+        "capture-2026-09-v4.21-probe1-fault.json",
+    ],
+)
+def test_every_fixture_parses_end_to_end(name) -> None:
+    chars = load_capture(name)
+    probes = parse_temperatures(chars[UUID_TEMPERATURES], fahrenheit=True)
+    assert len(probes) == 4
+    for uuid in UUID_PROBE_CONFIG:
+        parse_probe_config(chars[uuid], fahrenheit=True)
+    parse_device_info(chars[UUID_DEVICE_INFO])
+    parse_wifi(chars[UUID_WIFI])
+
+
+class TestProbeFaultState:
+    def test_faulted_probe_is_connected_with_unknown_temperature(self) -> None:
+        chars = load_capture("capture-2026-09-v4.21-probe1-fault.json")
+        p1 = parse_temperatures(chars[UUID_TEMPERATURES], fahrenheit=True)[0]
+        assert p1.connected is True
+        assert p1.temperature_c is None
+        assert p1.max_c == pytest.approx(27.2, abs=0.05)  # 81.0F
+        assert p1.min_c == pytest.approx(25.2, abs=0.05)  # 77.3F
+
+    def test_alarm_state_with_unknown_temperature_is_not_alarming(self) -> None:
+        probe = ProbeTemps(connected=True, temperature_c=None, max_c=27.2, min_c=25.2)
+        assert alarm_state(probe, CFG) == (False, False)
 
 
 ATTACHED = ProbeTemps(connected=True, temperature_c=90.0, max_c=95.0, min_c=20.0)

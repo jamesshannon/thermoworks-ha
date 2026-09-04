@@ -2006,7 +2006,7 @@ git commit -m "docs(signals): protocol reference, Phase 1 checklist, read-only d
 
 ### Task 8: Apply Phase 1 findings (requires hardware captures)
 
-**Prerequisite:** all six captures from `docs/protocol/phase1-verification.md` exist and findings are recorded in `docs/protocol/signals-ble.md`. This task is executed by a human-in-the-loop session, not blindly.
+**Prerequisite (met 2026-09-04):** captures available — `docs/captures/signals-v4.21-20260904T220115Z-baseline.json` (dump script, probe 1 attached), `docs/captures/recon-2026-09-04-v4.21-probe1-fault.txt` (state-2 fault sample), `recon-2026-09-04-v4.21-noprobe.txt`, `recon-2026-09-04-v4.21-probe1-ok.txt`. The owner declined the °C, alarm-change, and WiFi-off scenarios; the battery-off-charger comparison is deferred (unit is charging). Findings are recorded in the spec §3 and the ledger; this task applies them.
 
 **Files:**
 - Modify: `tests/fixtures/signals/` (add real captures), `custom_components/thermoworks_bt/ble/signals.py`, `tests/ble/test_signals.py`
@@ -2014,10 +2014,18 @@ git commit -m "docs(signals): protocol reference, Phase 1 checklist, read-only d
 
 - [ ] **Step 1: Promote the baseline capture to a fixture**
 
-Copy `docs/captures/signals-<fw>-<stamp>-baseline.json` to `tests/fixtures/signals/capture-<YYYY-MM>-<fw>.json`. Add to `tests/ble/test_signals.py`:
+Copy `docs/captures/signals-v4.21-20260904T220115Z-baseline.json` to `tests/fixtures/signals/capture-2026-09-v4.21-baseline.json` (keep the file as produced; `load_capture` reads `hex` when present). Add to `tests/ble/test_signals.py`:
 
 ```python
-@pytest.mark.parametrize("name", ["capture-2024-01-v4.21.json", "capture-<YYYY-MM>-<fw>.json"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "capture-2024-01-v4.21.json",
+        "capture-2026-09-v4.21-noprobe.json",
+        "capture-2026-09-v4.21-baseline.json",
+        "capture-2026-09-v4.21-probe1-fault.json",
+    ],
+)
 def test_every_fixture_parses_end_to_end(name) -> None:
     chars = load_capture(name)
     probes = parse_temperatures(chars[UUID_TEMPERATURES], fahrenheit=True)
@@ -2030,73 +2038,9 @@ def test_every_fixture_parses_end_to_end(name) -> None:
 
 Run: `.venv\Scripts\python -m pytest tests/ble/test_signals.py -q`. If the new capture fails, the layout changed: update the parser and the 2024 fixture expectations together, keeping the 2024 test cases only if the old layout is still worth supporting (it is not — replace them with the new capture's values).
 
-- [ ] **Step 2 (branch A — unit flag found):** implement detection
+- [ ] **Step 2: Units — owner decision (2026-09-04): no unit detection, no config option**
 
-If scenario 3 (`celsius`) shows a field that flips, e.g. device-info field 0 changes from `100` to `101`, add to `signals.py`:
-
-```python
-def detect_fahrenheit(info: DeviceInfo | None) -> bool | None:
-    """Return the device display unit from device info, or None if not present."""
-    if info is None or len(info.raw_fields) <= <FIELD_INDEX>:
-        return None
-    value = info.raw_fields[<FIELD_INDEX>].strip()
-    if value == "<F_VALUE>":
-        return True
-    if value == "<C_VALUE>":
-        return False
-    return None
-```
-
-and in `SignalsDevice.async_read` replace `fahrenheit = self.fahrenheit` with:
-
-```python
-        detected = detect_fahrenheit(info)
-        fahrenheit = self.fahrenheit if detected is None else detected
-```
-
-Test (add to `tests/ble/test_signals.py`, using the real values from the captures):
-
-```python
-class TestDetectFahrenheit:
-    def test_from_captures(self) -> None:
-        f = parse_device_info(load_capture("capture-<YYYY-MM>-<fw>.json")[UUID_DEVICE_INFO])
-        c = parse_device_info(load_capture("capture-<YYYY-MM>-<fw>-celsius.json")[UUID_DEVICE_INFO])
-        assert detect_fahrenheit(f) is True
-        assert detect_fahrenheit(c) is False
-
-    def test_none_when_absent(self) -> None:
-        assert detect_fahrenheit(None) is None
-```
-
-(Also copy the `celsius` capture into `tests/fixtures/signals/`.)
-
-- [ ] **Step 2 (branch B — no unit flag anywhere):** config-flow selector
-
-Add to `const.py`:
-
-```python
-CONF_FAHRENHEIT = "fahrenheit"
-```
-
-In `config_flow.py`, change both `async_create_entry(... data={})` calls to store the unit, and add the field to the confirm/user forms:
-
-```python
-from homeassistant.const import CONF_ADDRESS
-import voluptuous as vol
-from .const import CONF_FAHRENHEIT, DOMAIN
-
-UNIT_SCHEMA = {vol.Required(CONF_FAHRENHEIT, default=True): bool}
-```
-
-`async_step_bluetooth_confirm`: `return self.async_create_entry(title=title, data={CONF_FAHRENHEIT: user_input.get(CONF_FAHRENHEIT, True)})` and `self.async_show_form(step_id="bluetooth_confirm", data_schema=vol.Schema(UNIT_SCHEMA), description_placeholders=placeholders)` (drop `_set_confirm_only()`). `async_step_user`: add `**UNIT_SCHEMA` to the schema and store it the same way.
-
-In `coordinator.py` `__init__`: `self._data = ThermoWorksBluetoothDeviceData(fahrenheit=entry.data.get(CONF_FAHRENHEIT, True))`.
-
-In `strings.json` add under both steps' `"data"`: `"fahrenheit": "Device displays °F (uncheck for °C)"`.
-
-Existing upstream config-flow tests assert `result2["data"] == {}` for BlueDOT — that assertion will now fail. This is the one permitted upstream-test edit: change it to `assert result2["data"] == {"fahrenheit": True}` and note it in the commit message.
-
-Add a test in `tests/ha/test_config_flow.py` that submits `{"fahrenheit": False}` for the Signals discovery and asserts it is stored.
+The owner declined the °C capture; the device is assumed to display °F. Keep `SignalsDevice(fahrenheit=True)` as the default and make the assumption explicit for users: in `custom_components/thermoworks_bt/ble/signals.py` change the `SignalsDevice.__init__` docstring's `fahrenheit` line to "Device display unit. Signals sends temperatures in its display unit with no unit marker; v1 assumes °F. If the unit is set to °C every temperature will be off by the F→C transform (obvious in HA)." No code-path change, no config flow change. Task 9 adds the same sentence to `README.md` and `info.md`.
 
 - [ ] **Step 2b: Per-field state flags (finding from `docs/captures/recon-2026-09-04-v4.21-probe1-fault.txt`)**
 
@@ -2154,11 +2098,11 @@ class TestProbeFaultState:
 
 - [ ] **Step 3: Resolve the `32` low-alarm question**
 
-If scenario 5 shows the low alarm value is arbitrary user data (e.g. `40` after setting 40), keep `alarm_state` as written. If `32` is a fixed "disabled" marker, change `alarm_state` so `low` is `False` when `cfg.alarm_low_c` equals the disabled sentinel, and add a parametrized test case.
+Resolved from the baseline capture without a dedicated scenario: probe 1 (user-configured "Gril") reads `360,225`, probes 2–4 read `120,32` / `160,32` — `32` (°F) is simply the factory-default low setpoint, not a "disabled" marker. Keep `alarm_state` as written. Add one sentence to `docs/protocol/signals-ble.md` Open questions: "`32` is the factory default low setpoint (0 °C); a low alarm at that value never fires in practice."
 
-- [ ] **Step 4: Record notify findings**
+- [ ] **Step 4: Record notify findings (already captured)**
 
-If scenario 1 shows the temperature characteristic notifies on change, add a note in `docs/protocol/signals-ble.md` under "Future work: subscribe instead of poll". Do not change the driver in v1.
+The baseline capture (`docs/captures/signals-v4.21-20260904T220115Z-baseline.json`, `notifications: []`, and the controller's run log) shows that **every** notify subscription is refused by the device with `GATT Protocol Error: Write Not Permitted` on the CCCD — notifications are gated behind the app's handshake on the write-only `4E8A02FE…` channel. In `docs/protocol/signals-ble.md`: set the "Any characteristic notifies?" row to "advertised, but CCCD write refused (Write Not Permitted) — read polling is the only local path", and add a short "Subscribe instead of poll" note under Open questions saying it would require reverse-engineering the app handshake (Phase 3 scope). Do not change the driver.
 
 - [ ] **Step 5: Run BLE suite, commit, push, check CI**
 
@@ -2171,7 +2115,7 @@ git commit -m "feat(signals): apply Phase 1 protocol verification findings" -m "
 git push origin feature/signals
 ```
 
-Then confirm CI as in Task 6 Step 8 (branch B adds a config-flow test that must show `PASSED` there).
+Then confirm CI as in Task 6 Step 8.
 
 ---
 
@@ -2251,6 +2195,6 @@ Owner does the physical steps; the agent checks state through the HA MCP tools.
 
 **Spec coverage:** §3 protocol → Task 3 constants + Task 7 docs. §4.1 entities → Task 4 keys + Task 6 descriptions (battery, diagnostic temps, channel label text, wifi). §4.2 derived alarms → Task 4 `alarm_state`. §4.3 unit handling → Task 4 default + Task 8 branches A/B. §4.4 polling → Task 2 per-driver interval. §5 driver layer → Tasks 1, 2, 5. §5.3 failure policy and read order → Task 5. §6 HA wiring → Task 6 (config-flow title via `device_name`, no config-flow code change). §7 testing → each task. §8 Phase 1 → Task 7 script + checklist, Task 8 application. §9 handoff → this document, `CLAUDE.md`, `docs/protocol/`. §10 future write support → deliberately unplanned. §11 risks → Task 8 and Task 9 step 7.
 
-**Placeholder scan:** Task 8 contains `<FIELD_INDEX>`, `<F_VALUE>`, `<C_VALUE>`, `<YYYY-MM>`, `<fw>` — these are values that *only the hardware can supply*; the surrounding code is complete and the checklist says where each value comes from. No other placeholders.
+**Placeholder scan:** none remaining after the 2026-09-04 Phase 1 rewrite of Task 8.
 
-**Type consistency:** `DeviceDriver.async_read(client, *, timeout)` is used identically in Tasks 1, 2, 5. `SignalsReading` field names (`probes`, `configs`, `info`, `wifi`) match between Tasks 4 and 5. Entity keys in Task 4 match `SENSOR_DESCRIPTION_OVERRIDES` in Task 6 and the entity IDs checked on the live instance in Task 9 Step 7. `driver_for(local_name, **options)` signature is the same in Tasks 1, 2, 5. `ThermoWorksBluetoothDeviceData(**driver_options)` (Task 2) is what Task 8 branch B passes `fahrenheit=` through.
+**Type consistency:** `DeviceDriver.async_read(client, *, timeout)` is used identically in Tasks 1, 2, 5. `SignalsReading` field names (`probes`, `configs`, `info`, `wifi`) match between Tasks 4 and 5. Entity keys in Task 4 match `SENSOR_DESCRIPTION_OVERRIDES` in Task 6 and the entity IDs checked on the live instance in Task 9 Step 7. `driver_for(local_name, **options)` signature is the same in Tasks 1, 2, 5.

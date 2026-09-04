@@ -32,11 +32,13 @@ Open questions (answered by Phase 1): unit flag location (°F vs °C) — candid
 | Probe config layout | observed (probes 1 & 4) | confirmed (field 2 = flag) |
 | Device info: battery at field 1 | inferred | field 0, provisional (unit charging, app comparison pending) |
 | Unit flag location | unknown | unknown |
-| Any characteristic notifies? | unknown | all data characteristics advertise `notify` (not yet exercised) |
+| Probe state 2 = fault (attached, value invalid) | not observed | observed 2026-09-04 (`573.0,2,81.0,0,77.3,0` while max/min stayed state 0); cleared after reseating the probe |
+| Any characteristic notifies? | unknown | advertised on all data characteristics, but CCCD write refused (`Write Not Permitted`) — read polling is the only local path |
 | Read latency for 7 reads on ESP32 proxy | unknown | unknown |
 
 ## Open questions
 
-1. Where is the °F/°C flag? Candidates: device-info field 0 or 2, or one of the unknown characteristics.
-2. Does `32` as a low alarm mean "disabled" (32 °F = 0 °C is the device default)?
+1. Where is the °F/°C flag? Candidates: device-info field 0 or 2, or one of the unknown characteristics. The owner declined the °C capture; v1 assumes °F with no detection and no config option.
+2. Does `32` as a low alarm mean "disabled" (32 °F = 0 °C is the device default)? Resolved from the baseline capture: `32` is the factory default low setpoint (0 °C); a low alarm at that value never fires in practice.
 3. Do the 7 unknown characteristics carry `write` or `notify` properties? (The dump script records properties without writing.)
+4. Subscribe instead of poll: every data characteristic advertises `notify`, but subscribing (CCCD write) is refused with `Write Not Permitted` — the device gates notifications behind the app's handshake on the write-only `4E8A02FE…` channel. Reverse-engineering that handshake is Phase 3 scope.

@@ -50,6 +50,7 @@ FIELDS_PER_PROBE = 7
 _TEMP_INDEX, _STATE_INDEX, _MAX_INDEX, _MIN_INDEX = 0, 1, 2, 4
 PROBE_ATTACHED_STATE = 0
 NO_PROBE_STATE = 3
+PROBE_FAULT_STATE = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,24 +118,31 @@ def _to_celsius(value: float, fahrenheit: bool) -> float:
     return round((value - 32.0) * 5.0 / 9.0, 1) if fahrenheit else round(value, 1)
 
 
+def _valid(
+    fields: list[str], base: int, value_index: int, fahrenheit: bool
+) -> float | None:
+    """Return the value at value_index if its own state flag (value_index+1) is 0."""
+    if int(fields[base + value_index + 1]) != PROBE_ATTACHED_STATE:
+        return None
+    return _to_celsius(float(fields[base + value_index]), fahrenheit)
+
+
 def parse_temperatures(data: bytes, fahrenheit: bool) -> tuple[ProbeTemps, ...]:
     """Parse the temperature characteristic into four ProbeTemps."""
     fields = _fields(data, PROBE_COUNT * FIELDS_PER_PROBE, "temperatures")
     probes: list[ProbeTemps] = []
     for p in range(PROBE_COUNT):
         base = p * FIELDS_PER_PROBE
-        state = int(fields[base + _STATE_INDEX])
-        if state != PROBE_ATTACHED_STATE:
+        connected = int(fields[base + _STATE_INDEX]) != NO_PROBE_STATE
+        if not connected:
             probes.append(ProbeTemps(False, None, None, None))
             continue
         probes.append(
             ProbeTemps(
                 connected=True,
-                temperature_c=_to_celsius(
-                    float(fields[base + _TEMP_INDEX]), fahrenheit
-                ),
-                max_c=_to_celsius(float(fields[base + _MAX_INDEX]), fahrenheit),
-                min_c=_to_celsius(float(fields[base + _MIN_INDEX]), fahrenheit),
+                temperature_c=_valid(fields, base, _TEMP_INDEX, fahrenheit),
+                max_c=_valid(fields, base, _MAX_INDEX, fahrenheit),
+                min_c=_valid(fields, base, _MIN_INDEX, fahrenheit),
             )
         )
     return tuple(probes)
@@ -212,8 +220,10 @@ class SignalsDevice(DeviceDriver):
         """Create the driver.
 
         Args:
-            fahrenheit: Assumed device display unit until a unit flag is located
-                (see docs/protocol/signals-ble.md, "Open questions").
+            fahrenheit: Device display unit. Signals sends temperatures in its
+                display unit with no unit marker; v1 assumes °F. If the unit is
+                set to °C every temperature will be off by the F→C transform
+                (obvious in HA).
         """
         super().__init__(fahrenheit=fahrenheit, **options)
         self.fahrenheit = fahrenheit
