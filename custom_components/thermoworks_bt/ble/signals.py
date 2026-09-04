@@ -243,30 +243,51 @@ class SignalsDevice(DeviceDriver):
     ) -> SignalsReading:
         """Read all characteristics inside one connection.
 
-        Device info is read first so a unit flag (if one is ever located there)
-        is known before temperatures are parsed. Temperature failures propagate;
-        every other read degrades to None for that part of the reading.
+        Temperatures are read first; any failure there (including a timeout)
+        propagates and fails the poll, since nothing useful can be reported
+        without them. The optional reads follow (device info, wifi, then the
+        four probe configs) and each degrades to ``None`` on any failure,
+        including a timeout. To keep a poll bounded, the first optional read
+        that times out sets a flag that short-circuits every remaining
+        optional read to ``None`` without touching the client again (so one
+        unresponsive characteristic costs one timeout, not six).
         """
-        info = await self._read_optional(
-            client, UUID_DEVICE_INFO, parse_device_info, timeout, "device info"
-        )
         fahrenheit = self.fahrenheit
 
         raw = await asyncio.wait_for(client.read_gatt_char(UUID_TEMPERATURES), timeout)
         _LOGGER.debug("temperatures: %s", bytes(raw))
         probes = parse_temperatures(bytes(raw), fahrenheit)
 
-        wifi = await self._read_optional(client, UUID_WIFI, parse_wifi, timeout, "wifi")
-        configs = tuple(
-            [
-                await self._read_optional(
-                    client, uuid, lambda b: parse_probe_config(b, fahrenheit),
-                    timeout, f"probe {n} config",
-                )
-                for n, uuid in enumerate(UUID_PROBE_CONFIG, start=1)
-            ]
+        skip_optional = False
+
+        info, timed_out = await self._read_optional(
+            client, UUID_DEVICE_INFO, parse_device_info, timeout, "device info"
         )
-        return SignalsReading(probes=probes, configs=configs, info=info, wifi=wifi)
+        skip_optional = skip_optional or timed_out
+
+        if skip_optional:
+            wifi = None
+        else:
+            wifi, timed_out = await self._read_optional(
+                client, UUID_WIFI, parse_wifi, timeout, "wifi"
+            )
+            skip_optional = skip_optional or timed_out
+
+        configs: list[ProbeConfig | None] = []
+        for n, uuid in enumerate(UUID_PROBE_CONFIG, start=1):
+            if skip_optional:
+                configs.append(None)
+                continue
+            cfg, timed_out = await self._read_optional(
+                client, uuid, lambda b: parse_probe_config(b, fahrenheit),
+                timeout, f"probe {n} config",
+            )
+            configs.append(cfg)
+            skip_optional = skip_optional or timed_out
+
+        return SignalsReading(
+            probes=probes, configs=tuple(configs), info=info, wifi=wifi
+        )
 
     @staticmethod
     async def _read_optional(
@@ -275,21 +296,27 @@ class SignalsDevice(DeviceDriver):
         parse: Callable[[bytes], T],
         timeout: float,
         what: str,
-    ) -> T | None:
-        """Read + parse one characteristic; None on any failure except timeout."""
+    ) -> tuple[T | None, bool]:
+        """Read + parse one characteristic.
+
+        Returns ``(value, timed_out)``. ``value`` is None on any failure
+        (including a timeout); ``timed_out`` is True only for a timeout, so
+        the caller can short-circuit remaining optional reads.
+        """
         try:
             raw = await asyncio.wait_for(client.read_gatt_char(uuid), timeout)
-        except asyncio.TimeoutError:
-            raise
+        except TimeoutError as err:  # asyncio.TimeoutError is TimeoutError on py3.11+
+            _LOGGER.debug("Signals %s read timed out: %s", what, err)
+            return None, True
         except Exception as err:  # noqa: BLE001 - degrade, do not fail the poll
             _LOGGER.debug("Signals %s read failed: %s", what, err)
-            return None
+            return None, False
         _LOGGER.debug("%s: %s", what, bytes(raw))
         try:
-            return parse(bytes(raw))
+            return parse(bytes(raw)), False
         except ValueError as err:
             _LOGGER.debug("Signals %s parse failed: %s", what, err)
-            return None
+            return None, False
 
     def apply(self, reading: SignalsReading, data: SensorData) -> None:
         """Translate a Signals reading into sensor/binary-sensor keys on ``data``."""

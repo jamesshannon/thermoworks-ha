@@ -148,18 +148,18 @@ def is_signals(name: str | None) -> bool          # name.startswith("TMW022")
 def alarm_state(probe: ProbeTemps, cfg: ProbeConfig | None) -> tuple[bool, bool]  # (high, low)
 ```
 
-`SignalsDevice.async_read` read order and failure policy:
+`SignalsDevice.async_read` read order and failure policy (controller ruling, post-implementation):
 
 | Read | On failure |
 |---|---|
-| temperatures | raise — poll fails (nothing useful without it) |
+| temperatures | raise on any error, including a timeout — poll fails (nothing useful without it) |
 | device info | log at debug, `info=None`; battery emitted as `None` this poll |
 | wifi | log at debug, `wifi=None`; `wifi_connected` emitted as `None` |
 | probe config ×4 | log at debug, that probe's `config=None`; setpoints, label, and derived alarms for that probe emitted as `None` (unknown ≠ `False`) |
 
-`apply()` always emits the full key set; unknown values are `None`. HA's `PassiveBluetoothDataProcessor` merges each update into the previous one, so a key that is simply omitted would keep its stale value — `None` is the only way to say "unknown now".
+Every optional read (device info, wifi, each probe config) degrades to `None` on **any** exception, including `asyncio.TimeoutError`/`TimeoutError` — a timeout is no longer special-cased to propagate. `apply()` always emits the full key set; unknown values are `None`. HA's `PassiveBluetoothDataProcessor` merges each update into the previous one, so a key that is simply omitted would keep its stale value — `None` is the only way to say "unknown now".
 
-Read order: device info first (so a unit flag, if Phase 1 finds one there, is known before temperatures are parsed), then temperatures, wifi, probe configs. Each read is wrapped in `asyncio.wait_for(..., timeout)` where `timeout` is passed in by `parser.py`.
+Read order: **temperatures first** (so the poll fails fast if the device is unresponsive), then the optional reads — device info, wifi, probe configs 1–4, in that order. Each read is wrapped in `asyncio.wait_for(..., timeout)` where `timeout` is passed in by `parser.py`. To keep a poll bounded, the first optional read that times out short-circuits every remaining optional read straight to `None` without touching the client again — one unresponsive characteristic costs one timeout, not up to six.
 
 ## 6. Home Assistant wiring
 

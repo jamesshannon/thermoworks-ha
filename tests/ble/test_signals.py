@@ -358,15 +358,24 @@ class TestSignalsDeviceApply:
 class FakeClient:
     """Minimal BleakClient stand-in keyed by lowercase UUID."""
 
-    def __init__(self, responses: dict[str, bytes | Exception], delay: float = 0.0):
+    def __init__(
+        self,
+        responses: dict[str, bytes | Exception],
+        delay: float = 0.0,
+        delays: dict[str, float] | None = None,
+    ):
         self.responses = responses
         self.delay = delay
+        self.delays = delays or {}
         self.reads: list[str] = []
 
     async def read_gatt_char(self, uuid):
         uuid = str(uuid).lower()
         self.reads.append(uuid)
-        if self.delay:
+        per_uuid_delay = self.delays.get(uuid, 0.0)
+        if per_uuid_delay:
+            await asyncio.sleep(per_uuid_delay)
+        elif self.delay:
             await asyncio.sleep(self.delay)
         value = self.responses[uuid]
         if isinstance(value, Exception):
@@ -385,13 +394,10 @@ class TestSignalsAsyncRead:
         assert reading.wifi.connected is True
 
     @pytest.mark.asyncio
-    async def test_reads_device_info_before_temperatures(self, capture) -> None:
+    async def test_reads_temperatures_first(self, capture) -> None:
         client = FakeClient(capture)
         await SignalsDevice().async_read(client, timeout=1.0)
-        assert (
-            client.reads.index(UUID_DEVICE_INFO)
-            < client.reads.index(UUID_TEMPERATURES)
-        )
+        assert client.reads[0] == UUID_TEMPERATURES
 
     @pytest.mark.asyncio
     async def test_temperature_read_failure_raises(self, capture) -> None:
@@ -417,8 +423,20 @@ class TestSignalsAsyncRead:
         assert reading.configs[1] is None
 
     @pytest.mark.asyncio
-    async def test_read_timeout_raises(self, capture) -> None:
+    async def test_temperature_timeout_raises(self, capture) -> None:
         with pytest.raises(asyncio.TimeoutError):
             await SignalsDevice().async_read(
                 FakeClient(capture, delay=0.2), timeout=0.05
             )
+
+    @pytest.mark.asyncio
+    async def test_optional_timeout_degrades_and_short_circuits(self, capture) -> None:
+        client = FakeClient(
+            capture, delays={UUID_DEVICE_INFO: 0.2}
+        )
+        reading = await SignalsDevice().async_read(client, timeout=0.05)
+        assert reading.probes[0].connected is True
+        assert reading.info is None
+        assert reading.wifi is None
+        assert reading.configs == (None, None, None, None)
+        assert client.reads == [UUID_TEMPERATURES, UUID_DEVICE_INFO]
