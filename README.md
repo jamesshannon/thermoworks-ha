@@ -66,6 +66,7 @@ Signals caveats (v1):
 - **Faulted probe:** an attached probe reporting a fault (device state 2) shows *Probe* on with an *unknown* temperature and *unknown* alarm states.
 - **Polling only:** the device advertises notifications but refuses to enable them without the app's handshake, so the integration reads every 30 s over an active connection (ESP32/ESPHome proxies with `active: true`, or a local adapter). Close the ThermoWorks phone app — it holds the only BLE connection.
 - **Battery** is read from a device-info field that is provisional; while charging it fluctuates.
+- **Firmware updates:** disable this integration's Signals entry (Settings → Devices & Services → ThermoWorks Bluetooth → Signals → Disable) or power off the Bluetooth proxy **before** updating the Signals firmware in the ThermoWorks app. The update runs over the same single BLE connection, and a 30 s poll landing mid-update can interrupt it.
 
 ## Technical Details
 

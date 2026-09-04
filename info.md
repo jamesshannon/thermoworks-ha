@@ -32,7 +32,7 @@ Integrate your ThermoWorks Bluetooth thermometers with Home Assistant.
 
 The integration will automatically discover your device and create temperature, probe status, and alarm sensors.
 
-Signals alarms are computed by Home Assistant from the device's setpoints (low alarms read *on* from a cold start); close the ThermoWorks app while Home Assistant is polling.
+Signals alarms are computed by Home Assistant from the device's setpoints (low alarms read *on* from a cold start); close the ThermoWorks app while Home Assistant is polling. Disable the Signals entry before running a firmware update in the app.
 
 ## Technical Details
 
