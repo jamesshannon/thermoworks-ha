@@ -57,9 +57,9 @@ One HA device per Signals, identified by BLE MAC. Entity keys are stable and do 
 
 | Key | Platform | Class / Unit | Source | Category |
 |---|---|---|---|---|
-| `probe_{n}_temperature` (n=1..4) | sensor | temperature, °C | temps `[p*7+0]`; **omitted from the update when state ≠ 0** so HA shows `unavailable` rather than −63 | primary |
+| `probe_{n}_temperature` (n=1..4) | sensor | temperature, °C | temps `[p*7+0]`; **emitted as `None` when state ≠ 0** so HA shows `unknown` rather than −63 (HA's passive processor merges updates, so a key must be sent as `None` to clear it — omitting it would freeze the last value) | primary |
 | `probe_{n}_connected` | binary_sensor | connectivity | temps `[p*7+1] == 0` | primary |
-| `probe_{n}_max`, `probe_{n}_min` | sensor | temperature, °C | temps `[+2]`, `[+4]`; omitted when no probe | diagnostic |
+| `probe_{n}_max`, `probe_{n}_min` | sensor | temperature, °C | temps `[+2]`, `[+4]`; `None` when no probe | diagnostic |
 | `probe_{n}_alarm_high_setpoint`, `probe_{n}_alarm_low_setpoint` | sensor | temperature, °C | probe-config `[0]`, `[1]` | diagnostic |
 | `probe_{n}_alarm_high` | binary_sensor | problem | **derived in driver:** `connected and temp >= high_setpoint` | primary — the automation hook |
 | `probe_{n}_alarm_low` | binary_sensor | problem | **derived:** `connected and temp <= low_setpoint` (see open question on `32`) | primary |
@@ -93,17 +93,22 @@ Connect-per-poll, advertisement-triggered with a 60 s timer fallback (unchanged 
 ### 5.1 Driver protocol — `custom_components/thermoworks_bt/ble/device.py` (new)
 
 ```python
-class ThermoWorksDevice(Protocol):
-    device_type: str            # "BlueDOT" | "Signals"
-    min_poll_interval: float
+class DeviceDriver(ABC):
+    device_type: ClassVar[str]            # "BlueDOT" | "Signals"
+    min_poll_interval: ClassVar[float]    # seconds
 
-    @staticmethod
-    def matches(local_name: str | None) -> bool: ...
-    async def async_read(self, client: BleakClient) -> Reading: ...   # client already connected
-    def apply(self, reading: Reading, data: BluetoothData) -> None: ... # emit sensor/binary keys
+    def __init__(self, **options: Any) -> None: ...          # drivers ignore options they don't use
+    @classmethod
+    @abstractmethod
+    def matches(cls, local_name: str | None) -> bool: ...
+    def device_name(self, local_name: str | None, address: str) -> str: ...  # default: local_name or device_type
+    @abstractmethod
+    async def async_read(self, client: BleakClient, *, timeout: float) -> Any: ...   # client already connected
+    @abstractmethod
+    def apply(self, reading: Any, data: SensorData) -> None: ...                    # emit sensor/binary keys
 ```
 
-`ble/__init__.py` exports `DRIVERS: list[type[ThermoWorksDevice]]` and `driver_for(local_name)`.
+`ble/device.py` also holds `DRIVERS: tuple[type[DeviceDriver], ...]` and `driver_for(local_name, **options) -> DeviceDriver | None`. `timeout` is passed by `parser.py` from its module-level `NOTIFICATION_TIMEOUT` so the existing upstream test that patches `parser.NOTIFICATION_TIMEOUT` keeps working without modification.
 
 ### 5.2 `parser.py` (refactor)
 
@@ -144,11 +149,13 @@ def alarm_state(probe: ProbeTemps, cfg: ProbeConfig | None) -> tuple[bool, bool]
 | Read | On failure |
 |---|---|
 | temperatures | raise — poll fails (nothing useful without it) |
-| device info | log at debug, `info=None`; battery omitted this poll |
-| wifi | log at debug, `wifi=None` |
-| probe config ×4 | log at debug, that probe's `config=None`; setpoints, label, and derived alarms for that probe are omitted this poll (unknown ≠ `False`) |
+| device info | log at debug, `info=None`; battery emitted as `None` this poll |
+| wifi | log at debug, `wifi=None`; `wifi_connected` emitted as `None` |
+| probe config ×4 | log at debug, that probe's `config=None`; setpoints, label, and derived alarms for that probe emitted as `None` (unknown ≠ `False`) |
 
-`apply()` emits only keys for which data exists this poll; the HA layer treats missing keys as unchanged/unavailable per upstream behavior.
+`apply()` always emits the full key set; unknown values are `None`. HA's `PassiveBluetoothDataProcessor` merges each update into the previous one, so a key that is simply omitted would keep its stale value — `None` is the only way to say "unknown now".
+
+Read order: device info first (so a unit flag, if Phase 1 finds one there, is known before temperatures are parsed), then temperatures, wifi, probe configs. Each read is wrapped in `asyncio.wait_for(..., timeout)` where `timeout` is passed in by `parser.py`.
 
 ## 6. Home Assistant wiring
 
@@ -168,6 +175,16 @@ Preserved upstream behaviors: entities persist as `unavailable` when out of rang
 ## 7. Testing
 
 Framework: upstream pytest layout (`tests/ble/` pure, `tests/ha/` with `pytest-homeassistant-custom-component`). TDD per task.
+
+**Where tests run (owner decision, 2026-09-04):** Home Assistant does not install on Windows and the owner does not want the HA test harness installed locally. Therefore:
+
+| Layer | Runs where | How |
+|---|---|---|
+| `tests/ble/` | Locally, lean venv (bleak, sensor-state-data, pytest, ruff) | `tests/ble/conftest.py` registers synthetic parent packages so the `ble` sub-package imports without HA |
+| `tests/ha/` | GitHub CI only (`validate.yaml`, on push to the fork) | CI runs HA tests with `\|\| true` — the step log must be read |
+| HA integration behaviour | Owner's live HA via the HA MCP tools | `ha_write_file` the component, `ha_restart`, `ha_get_logs`, `ha_get_entity_state` |
+
+Consequently `tests/ha/` additions are kept minimal (config-flow discovery, entry loads); entity-level assertions are done against the live instance.
 
 | File | Coverage |
 |---|---|
