@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
 import pytest
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -21,17 +19,6 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 def auto_mock_bluetooth(mock_bluetooth):
     """Mock bluetooth for all tests."""
     return mock_bluetooth
-
-
-@pytest.fixture(autouse=True)
-def mock_bluetooth_setup():
-    """Mock bluetooth and bluetooth_adapters setup to bypass hardware dependencies."""
-    with (
-        patch("homeassistant.components.bluetooth.async_setup", return_value=True),
-        patch("homeassistant.components.bluetooth.async_setup_entry", return_value=True),
-        patch("homeassistant.components.bluetooth_adapters.async_setup", return_value=True),
-    ):
-        yield
 
 
 @pytest.fixture
