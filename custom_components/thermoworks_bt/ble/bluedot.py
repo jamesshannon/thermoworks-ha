@@ -174,8 +174,8 @@ class BlueDOTDevice(DeviceDriver):
             await asyncio.sleep(0.5)
             try:
                 await client.stop_notify(CHARACTERISTIC_UUID)
-            except Exception:  # noqa: BLE001 - best effort cleanup
-                pass
+            except Exception as err:  # noqa: BLE001 - best effort cleanup
+                _LOGGER.debug("Error stopping stale notification: %s", err)
             await client.start_notify(CHARACTERISTIC_UUID, _on_notification)
 
         try:
