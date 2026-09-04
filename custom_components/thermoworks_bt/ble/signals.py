@@ -47,8 +47,10 @@ class ProbeConfig:
 
     alarm_high_c: float | None
     alarm_low_c: float | None
-    channel: int
+    flag: int
+    """Raw field 2. Observed 0/1; meaning unknown (it is NOT the channel number)."""
     label: str
+    """Channel label as sent by the device (custom names are truncated to 4 chars)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,10 +58,12 @@ class DeviceInfo:
     """Device-level information."""
 
     battery_pct: int
+    """Field 0. Provisional: 2024 notes guessed field 1, but field 1 reads 0 on a
+    running unit while field 0 reads a plausible percentage."""
     mac: str
     firmware: str
     raw_fields: tuple[str, ...]
-    """All fields as received; field 0 (observed ``100``) is not yet understood."""
+    """All fields as received; fields 1 and 2 are not yet understood."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,20 +120,20 @@ def parse_temperatures(data: bytes, fahrenheit: bool) -> tuple[ProbeTemps, ...]:
 
 
 def parse_probe_config(data: bytes, fahrenheit: bool) -> ProbeConfig:
-    """Parse one probe-config characteristic: high, low, channel, label, ..."""
+    """Parse one probe-config characteristic: high, low, flag, label, ..."""
     fields = _fields(data, 4, "probe config")
     return ProbeConfig(
         alarm_high_c=_to_celsius(float(fields[0]), fahrenheit),
         alarm_low_c=_to_celsius(float(fields[1]), fahrenheit),
-        channel=int(fields[2]),
+        flag=int(fields[2]),
         label=fields[3].strip(),
     )
 
 
 def parse_device_info(data: bytes) -> DeviceInfo:
-    """Parse the device-info characteristic: ?, battery, ?, mac, firmware."""
+    """Parse the device-info characteristic: battery, ?, ?, mac, firmware."""
     fields = _fields(data, 5, "device info")
-    battery = int(fields[1])
+    battery = int(fields[0])
     if not 0 <= battery <= 100:
         raise ValueError(f"Signals device info: battery out of range: {battery}")
     return DeviceInfo(

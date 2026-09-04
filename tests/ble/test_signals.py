@@ -12,7 +12,6 @@ from custom_components.thermoworks_bt.ble.signals import (
     UUID_PROBE_CONFIG,
     UUID_TEMPERATURES,
     UUID_WIFI,
-    ProbeConfig,
     ProbeTemps,
     WifiInfo,
     is_signals,
@@ -101,23 +100,22 @@ class TestParseTemperatures:
 class TestParseProbeConfig:
     def test_fixture_probe_1(self, capture) -> None:
         cfg = parse_probe_config(capture[UUID_PROBE_CONFIG[0]], fahrenheit=True)
-        assert cfg == ProbeConfig(
-            alarm_high_c=pytest.approx(71.1, abs=0.05),
-            alarm_low_c=pytest.approx(0.0, abs=0.05),
-            channel=1,
-            label="CH 1",
-        )
+        assert cfg.alarm_high_c == pytest.approx(71.1, abs=0.05)
+        assert cfg.alarm_low_c == pytest.approx(0.0, abs=0.05)
+        assert cfg.flag == 1
+        assert cfg.label == "CH 1"
 
     def test_fixture_probe_4_with_trailing_fields(self, capture) -> None:
         cfg = parse_probe_config(capture[UUID_PROBE_CONFIG[3]], fahrenheit=True)
-        assert cfg.channel == 4
+        assert cfg.flag == 1
         assert cfg.label == "CH 4"
 
     def test_celsius_passthrough_and_custom_label(self) -> None:
-        cfg = parse_probe_config(b"95,60,2,Brisket,0.0", fahrenheit=False)
+        cfg = parse_probe_config(b"95,60,0,Bris,0.0,", fahrenheit=False)
         assert cfg.alarm_high_c == 95.0
         assert cfg.alarm_low_c == 60.0
-        assert cfg.label == "Brisket"
+        assert cfg.flag == 0
+        assert cfg.label == "Bris"
 
     def test_too_few_fields_raises(self) -> None:
         with pytest.raises(ValueError, match="expected at least 4 fields"):
@@ -127,10 +125,10 @@ class TestParseProbeConfig:
 class TestParseDeviceInfo:
     def test_fixture(self, capture) -> None:
         info = parse_device_info(capture[UUID_DEVICE_INFO])
-        assert info.battery_pct == 67
+        assert info.battery_pct == 100
         assert info.mac == "24:62:ab:e0:c1:be"
         assert info.firmware == "v4.21"
-        assert info.raw_fields[0] == "100"
+        assert info.raw_fields[1] == "67"
 
     def test_too_few_fields_raises(self) -> None:
         with pytest.raises(ValueError, match="expected at least 5 fields"):
@@ -138,7 +136,45 @@ class TestParseDeviceInfo:
 
     def test_battery_out_of_range_raises(self) -> None:
         with pytest.raises(ValueError):
-            parse_device_info(b"100,150,0,aa:bb:cc:dd:ee:ff,v4.21")
+            parse_device_info(b"150,0,0,aa:bb:cc:dd:ee:ff,v4.21")
+
+
+class TestCapture2026:
+    """Real payloads from the owner's unit: trailing commas, 4-char labels."""
+
+    @pytest.fixture
+    def capture26(self) -> dict[str, bytes]:
+        return load_capture("capture-2026-09-v4.21-noprobe.json")
+
+    def test_trailing_comma_and_no_probes(self, capture26) -> None:
+        probes = parse_temperatures(capture26[UUID_TEMPERATURES], fahrenheit=True)
+        assert len(probes) == 4
+        assert all(not p.connected and p.temperature_c is None for p in probes)
+
+    def test_probe_config_flag_and_truncated_label(self, capture26) -> None:
+        cfg = parse_probe_config(capture26[UUID_PROBE_CONFIG[0]], fahrenheit=True)
+        assert cfg.flag == 0
+        assert cfg.label == "Gril"
+        assert cfg.alarm_high_c == pytest.approx(182.2, abs=0.05)  # 360F
+        assert cfg.alarm_low_c == pytest.approx(107.2, abs=0.05)   # 225F
+        assert (
+            parse_probe_config(capture26[UUID_PROBE_CONFIG[1]], fahrenheit=True).flag
+            == 1
+        )
+
+    def test_probe_4_extra_fields_ignored(self, capture26) -> None:
+        cfg = parse_probe_config(capture26[UUID_PROBE_CONFIG[3]], fahrenheit=True)
+        assert cfg.label == "CH 4"
+        assert cfg.flag == 0
+
+    def test_device_info_battery_is_field_0(self, capture26) -> None:
+        info = parse_device_info(capture26[UUID_DEVICE_INFO])
+        assert info.battery_pct == 66
+        assert info.mac == "24:0a:c4:ec:2e:0e"
+        assert info.firmware == "v4.21"
+
+    def test_wifi(self, capture26) -> None:
+        assert parse_wifi(capture26[UUID_WIFI]).ssid == "Mo2Net"
 
 
 class TestParseWifi:
