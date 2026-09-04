@@ -108,7 +108,7 @@ class DeviceDriver(ABC):
     def apply(self, reading: Any, data: SensorData) -> None: ...                    # emit sensor/binary keys
 ```
 
-`ble/device.py` also holds `DRIVERS: tuple[type[DeviceDriver], ...]` and `driver_for(local_name, **options) -> DeviceDriver | None`. `timeout` is passed by `parser.py` from its module-level `NOTIFICATION_TIMEOUT` so the existing upstream test that patches `parser.NOTIFICATION_TIMEOUT` keeps working without modification.
+`ble/device.py` also holds `all_drivers() -> tuple[type[DeviceDriver], ...]` (function-local imports of the driver modules, to avoid a circular import) and `driver_for(local_name, **options) -> DeviceDriver | None`. `timeout` is passed by `parser.py` from its module-level `NOTIFICATION_TIMEOUT` so the existing upstream test that patches `parser.NOTIFICATION_TIMEOUT` keeps working without modification.
 
 ### 5.2 `parser.py` (refactor)
 

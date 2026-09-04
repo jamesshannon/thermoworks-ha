@@ -84,7 +84,7 @@ Run: `.venv\Scripts\python -m pytest tests/ble -q` → expected `41 passed`.
 **Interfaces:**
 - Produces:
   - `class DeviceDriver(ABC)` with `device_type: ClassVar[str]`, `min_poll_interval: ClassVar[float]`, `__init__(self, **options)`, `classmethod matches(cls, local_name: str | None) -> bool`, `device_name(self, local_name: str | None, address: str) -> str`, `async async_read(self, client: BleakClient, *, timeout: float) -> Any`, `apply(self, reading: Any, data: SensorData) -> None`
-  - `DRIVERS: tuple[type[DeviceDriver], ...]` and `driver_for(local_name: str | None, **options) -> DeviceDriver | None`
+  - `all_drivers() -> tuple[type[DeviceDriver], ...]` (lazy-imports the driver modules on each call to avoid circular imports) and `driver_for(local_name: str | None, **options) -> DeviceDriver | None`
   - `class BlueDOTDevice(DeviceDriver)` in `bluedot.py`, `device_type = "BlueDOT"`, `min_poll_interval = 30.0`
 
 - [ ] **Step 1: Write the failing tests**
@@ -253,18 +253,23 @@ class DeviceDriver(ABC):
         """Translate a reading into sensor/binary-sensor keys on ``data``."""
 
 
+def all_drivers() -> tuple[type[DeviceDriver], ...]:
+    """Return every known driver class, in match-priority order.
+
+    Driver modules import ``DeviceDriver`` from this module, so they are
+    imported lazily here rather than at module load to avoid a circular import.
+    """
+    from .bluedot import BlueDOTDevice
+
+    return (BlueDOTDevice,)
+
+
 def driver_for(local_name: str | None, **options: Any) -> DeviceDriver | None:
     """Return a new driver instance for the advertised name, or None."""
-    for driver_cls in DRIVERS:
+    for driver_cls in all_drivers():
         if driver_cls.matches(local_name):
             return driver_cls(**options)
     return None
-
-
-# Populated at the bottom to avoid circular imports: drivers import this module.
-from .bluedot import BlueDOTDevice  # noqa: E402
-
-DRIVERS: tuple[type[DeviceDriver], ...] = (BlueDOTDevice,)
 ```
 
 - [ ] **Step 4: Append `BlueDOTDevice` to `ble/bluedot.py`**
@@ -362,7 +367,7 @@ class BlueDOTDevice(DeviceDriver):
         )
 ```
 
-Note the circular import: `device.py` imports `bluedot.py` at the bottom; `bluedot.py` imports `DeviceDriver` from `device.py` at the top. This works because `DeviceDriver` is fully defined before the bottom import executes. Do not "fix" it by moving `DRIVERS` elsewhere.
+Note on imports: `bluedot.py` imports `DeviceDriver` from `device.py` at module top; `device.py` imports the driver classes only inside `all_drivers()`. Keep it that way — a module-level import in `device.py` of any driver module creates a circular import the moment `ble/__init__.py` imports `bluedot` first.
 
 - [ ] **Step 5: Run tests**
 
@@ -1226,7 +1231,7 @@ git commit -m "feat(signals): SignalsDevice.apply with derived alarm state" -m "
 
 **Interfaces:**
 - Consumes: `parse_*`, `SignalsReading` (Tasks 3–4)
-- Produces: `SignalsDevice.async_read(client, *, timeout) -> SignalsReading`; `DRIVERS == (BlueDOTDevice, SignalsDevice)`; `ble/__init__` exports `SignalsDevice`, `SignalsReading`, `is_signals`, `driver_for`, `DeviceDriver`, `BlueDOTDevice`
+- Produces: `SignalsDevice.async_read(client, *, timeout) -> SignalsReading`; `all_drivers() == (BlueDOTDevice, SignalsDevice)`; `ble/__init__` exports `SignalsDevice`, `SignalsReading`, `is_signals`, `driver_for`, `all_drivers`, `DeviceDriver`, `BlueDOTDevice`
 
 - [ ] **Step 1: Append failing tests to `tests/ble/test_signals.py`**
 
@@ -1314,9 +1319,17 @@ class TestDriverRegistry:
     def test_exports(self) -> None:
         from custom_components.thermoworks_bt import ble
 
-        for name in ("DeviceDriver", "driver_for", "BlueDOTDevice", "SignalsDevice",
-                     "SignalsReading", "is_signals", "ThermoWorksBluetoothDeviceData"):
+        for name in ("DeviceDriver", "driver_for", "all_drivers", "BlueDOTDevice",
+                     "SignalsDevice", "SignalsReading", "is_signals",
+                     "ThermoWorksBluetoothDeviceData"):
             assert name in ble.__all__, name
+
+    def test_all_drivers_order(self) -> None:
+        from custom_components.thermoworks_bt.ble.bluedot import BlueDOTDevice
+        from custom_components.thermoworks_bt.ble.device import all_drivers
+        from custom_components.thermoworks_bt.ble.signals import SignalsDevice
+
+        assert all_drivers() == (BlueDOTDevice, SignalsDevice)
 ```
 
 - [ ] **Step 2: Run to verify failure**
@@ -1375,14 +1388,19 @@ Add `import asyncio` to the top of `signals.py`.
 
 - [ ] **Step 4: Register the driver in `device.py`**
 
-Replace the bottom of `device.py`:
+Replace the body of `all_drivers()`:
 
 ```python
-# Populated at the bottom to avoid circular imports: drivers import this module.
-from .bluedot import BlueDOTDevice  # noqa: E402
-from .signals import SignalsDevice  # noqa: E402
+def all_drivers() -> tuple[type[DeviceDriver], ...]:
+    """Return every known driver class, in match-priority order.
 
-DRIVERS: tuple[type[DeviceDriver], ...] = (BlueDOTDevice, SignalsDevice)
+    Driver modules import ``DeviceDriver`` from this module, so they are
+    imported lazily here rather than at module load to avoid a circular import.
+    """
+    from .bluedot import BlueDOTDevice
+    from .signals import SignalsDevice
+
+    return (BlueDOTDevice, SignalsDevice)
 ```
 
 - [ ] **Step 5: Update `ble/__init__.py`**
@@ -1391,18 +1409,18 @@ DRIVERS: tuple[type[DeviceDriver], ...] = (BlueDOTDevice, SignalsDevice)
 """ThermoWorks BLE parsing library."""
 
 from .bluedot import BlueDOTDevice, BlueDOTReading, is_bluedot, parse_notification_data
-from .device import DRIVERS, DeviceDriver, driver_for
+from .device import DeviceDriver, all_drivers, driver_for
 from .parser import ThermoWorksBluetoothDeviceData
 from .signals import SignalsDevice, SignalsReading, is_signals
 
 __all__ = [
-    "DRIVERS",
     "BlueDOTDevice",
     "BlueDOTReading",
     "DeviceDriver",
     "SignalsDevice",
     "SignalsReading",
     "ThermoWorksBluetoothDeviceData",
+    "all_drivers",
     "driver_for",
     "is_bluedot",
     "is_signals",
