@@ -13,7 +13,7 @@ Home Assistant custom integration `thermoworks_bt` for ThermoWorks Bluetooth the
 
 ```
 custom_components/thermoworks_bt/
-  ble/device.py     DeviceDriver ABC: matches(), device_name(), async_read(client, timeout=), apply(reading, data); DRIVERS, driver_for()
+  ble/device.py     DeviceDriver ABC: matches(), device_name(), async_read(client, timeout=), apply(reading, data); all_drivers(), driver_for()
   ble/bluedot.py    BlueDOT driver (notify-based) — upstream code, keep behavior identical
   ble/signals.py    Signals driver (GATT reads, ASCII CSV parsing) — pure parse_* functions + SignalsDevice
   ble/parser.py     connection lifecycle only; picks driver via driver_for(name)

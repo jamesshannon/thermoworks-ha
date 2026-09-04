@@ -1,11 +1,11 @@
 # ThermoWorks Signals BLE protocol
 
-Sources: `wnoisephx/thermoworks-ble/Docs/Signals.txt` (Jan 2024) and a read-only GATT enumeration of the owner's unit on 2026-09-04 (`docs/captures/recon-2026-09-04-v4.21-noprobe.txt`; same firmware). **Remaining unknowns are resolved in Phase 1 (§8).**
+Sources: `wnoisephx/thermoworks-ble/Docs/Signals.txt` (Jan 2024) and a read-only GATT enumeration of the owner's unit on 2026-09-04 (`docs/captures/recon-2026-09-04-v4.21-noprobe.txt`; same firmware). **Remaining unknowns are resolved by the Phase 1 checklist (`phase1-verification.md`).**
 
 - **Advertisement:** local name `TMW022`; manufacturer data key = first two MAC bytes little-endian (`0x0A24` for `24:0A:…`, `0x6224` for `24:62:…`), payload = remaining four MAC bytes. The advertisement is static — no sensor data — so an **active GATT connection** is required for every read. ESP32 ESPHome proxies support active connections; Shelly proxies do not.
 - **Service:** `0000a002-0000-1000-8000-00805f9b34fb` holds every ThermoWorks characteristic.
 - **Payload encoding:** ASCII, comma-separated, usually with a **trailing comma** (so `split(",")` yields one extra empty field — parsers must tolerate extra fields). Not binary.
-- **Every data characteristic below also has `notify`** — v1 polls with reads; a later version can subscribe instead.
+- **Every data characteristic below also has `notify`** — v1 polls with reads; the device refuses CCCD writes without the app handshake, so subscribing is not possible (see Verification status).
 
 | Purpose | UUID | 2026 example | Layout |
 |---|---|---|---|

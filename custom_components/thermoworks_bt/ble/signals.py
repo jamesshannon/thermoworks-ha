@@ -115,7 +115,7 @@ def _fields(data: bytes, minimum: int, what: str) -> list[str]:
 
 
 def _to_celsius(value: float, fahrenheit: bool) -> float:
-    return round((value - 32.0) * 5.0 / 9.0, 1) if fahrenheit else round(value, 1)
+    return round((value - 32.0) * 5.0 / 9.0, 2) if fahrenheit else round(value, 2)
 
 
 def _valid(
@@ -174,10 +174,13 @@ def parse_device_info(data: bytes) -> DeviceInfo:
 
 
 def parse_wifi(data: bytes) -> WifiInfo:
-    """Parse the wifi characteristic: ssid, flag, host, flag."""
+    """Parse the wifi characteristic: ssid, flag, host, flag.
+
+    SSIDs containing a comma are not handled (payload has no escaping).
+    """
     fields = _fields(data, 2, "wifi")
     return WifiInfo(
-        ssid=fields[0],
+        ssid=fields[0].strip(),
         connected=fields[1].strip() == "1",
         cloud_host=fields[2].strip() if len(fields) > 2 else "",
     )

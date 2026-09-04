@@ -77,6 +77,7 @@ Signals caveats (v1):
 - **Dependencies**: Requires Home Assistant's Bluetooth integration
 - **Device Availability**: Entities persist as "unavailable" when device is off or out of range
 - **Connection Management**: Connects only when needed, immediately disconnects to free connection slots
+- **Polling overlap**: the 60 s fallback timer and advertisement-driven polls are not interlocked (upstream behaviour); with Signals' 7 reads per poll an overlap is possible but harmless (the device accepts one connection; the second attempt fails and retries).
 
 ## Differentiation from Core Integration
 

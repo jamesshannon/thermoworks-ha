@@ -76,11 +76,14 @@ _CHANNEL_LABEL = SensorEntityDescription(
 
 # Per-key overrides take precedence over the (device_class, unit) defaults.
 # Signals emits these keys (see ble/signals.py::SignalsDevice.apply).
-SENSOR_DESCRIPTION_OVERRIDES: dict[str, SensorEntityDescription] = {}
-for _n in range(1, 5):
-    for _suffix in ("max", "min", "alarm_high_setpoint", "alarm_low_setpoint"):
-        SENSOR_DESCRIPTION_OVERRIDES[f"probe_{_n}_{_suffix}"] = _DIAGNOSTIC_TEMPERATURE
-    SENSOR_DESCRIPTION_OVERRIDES[f"probe_{_n}_channel_label"] = _CHANNEL_LABEL
+SENSOR_DESCRIPTION_OVERRIDES: dict[str, SensorEntityDescription] = {
+    **{
+        f"probe_{n}_{suffix}": _DIAGNOSTIC_TEMPERATURE
+        for n in range(1, 5)
+        for suffix in ("max", "min", "alarm_high_setpoint", "alarm_low_setpoint")
+    },
+    **{f"probe_{n}_channel_label": _CHANNEL_LABEL for n in range(1, 5)},
+}
 
 
 def _description_for(

@@ -21,17 +21,17 @@ Command per scenario:
 .venv\Scripts\python scripts/dump_signals.py <ADDRESS> --scenario baseline --listen 60
 ```
 
-## Results (fill in)
+## Results
 
 | # | File | Findings |
 |---|---|---|
-| 1 | | |
-| 2 | | |
-| 3 | | |
-| 4 | | |
-| 5 | | |
-| 6 | | |
-| 7 | | |
+| 1 | `signals-v4.21-20260904T220115Z-baseline.json` | layout confirmed; all notify subscriptions refused |
+| 2 | — | declined by owner (2026-09-04) |
+| 3 | — | declined by owner (2026-09-04) |
+| 4 | — | declined by owner (2026-09-04) |
+| 5 | — | declined by owner (2026-09-04) |
+| 6 | — | declined by owner (2026-09-04) |
+| 7 | — | deferred — unit was charging |
 
 ## Hand-off to Task 8
 
