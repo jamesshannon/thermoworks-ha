@@ -40,7 +40,7 @@
 | `custom_components/thermoworks_bt/sensor.py` (modify) | battery default + per-key overrides + text sensor support | 6 |
 | `custom_components/thermoworks_bt/binary_sensor.py` (modify) | per-key overrides | 6 |
 | `custom_components/thermoworks_bt/manifest.json` (modify) | `TMW022*` matcher, version | 6, 9 |
-| `tests/fixtures/signals/capture-2024-01-v4.21.json` (new) | transcribed 2024 capture | 3 |
+| `tests/fixtures/signals/capture-2024-01-v4.21.json`, `capture-2026-09-v4.21-noprobe.json` (new) | transcribed captures | 3 |
 | `tests/ble/test_device.py` (new) | `driver_for`, `BlueDOTDevice` | 1 |
 | `tests/ble/test_signals.py` (new) | parse fns, alarm_state, apply, async_read | 3, 4, 5 |
 | `tests/ha/__init__.py` (modify, add only) | `SIGNALS_SERVICE_INFO` | 6 |
@@ -559,7 +559,8 @@ git commit -m "refactor(ble): parser delegates reads to DeviceDriver" -m "Co-Aut
 **Interfaces:**
 - Produces (all in `signals.py`):
   - constants `DEVICE_NAME_PREFIX = "TMW022"`, `NO_PROBE_STATE = 3`, `PROBE_COUNT = 4`, `FIELDS_PER_PROBE = 7`, `UUID_TEMPERATURES`, `UUID_DEVICE_INFO`, `UUID_WIFI`, `UUID_PROBE_CONFIG: tuple[str, str, str, str]` (all lowercase)
-  - dataclasses `ProbeTemps(connected: bool, temperature_c: float | None, max_c: float | None, min_c: float | None)`, `ProbeConfig(alarm_high_c: float | None, alarm_low_c: float | None, channel: int, label: str)`, `DeviceInfo(battery_pct: int, mac: str, firmware: str, raw_fields: tuple[str, ...])`, `WifiInfo(ssid: str, connected: bool, cloud_host: str)`
+  - dataclasses `ProbeTemps(connected: bool, temperature_c: float | None, max_c: float | None, min_c: float | None)`, `ProbeConfig(alarm_high_c: float | None, alarm_low_c: float | None, flag: int, label: str)` (`flag` = raw field 2, semantics unknown — NOT a channel number), `DeviceInfo(battery_pct: int, mac: str, firmware: str, raw_fields: tuple[str, ...])` (battery from field 0, provisional), `WifiInfo(ssid: str, connected: bool, cloud_host: str)`
+  - a second fixture `tests/fixtures/signals/capture-2026-09-v4.21-noprobe.json` transcribed from the owner's unit (`docs/captures/recon-2026-09-04-v4.21-noprobe.txt`)
   - `is_signals(name: str | None) -> bool`
   - `parse_temperatures(data: bytes, fahrenheit: bool) -> tuple[ProbeTemps, ...]`
   - `parse_probe_config(data: bytes, fahrenheit: bool) -> ProbeConfig`
@@ -568,7 +569,7 @@ git commit -m "refactor(ble): parser delegates reads to DeviceDriver" -m "Co-Aut
 
 - [ ] **Step 1: Create the fixture file**
 
-`tests/fixtures/signals/capture-2024-01-v4.21.json` — transcribed from `wnoisephx/thermoworks-ble/Docs/Signals.txt`. Probe 2 and 3 config lines were not in the capture; they are synthesized from probe 1's shape.
+`tests/fixtures/signals/capture-2024-01-v4.21.json` — transcribed from `wnoisephx/thermoworks-ble/Docs/Signals.txt`. Probe 2 and 3 config lines were not in the capture; they are synthesized from probe 1's shape. Field 2 of the probe-config payload is `1` in every captured line — it is a flag, not a channel number.
 
 ```json
 {
@@ -583,11 +584,35 @@ git commit -m "refactor(ble): parser delegates reads to DeviceDriver" -m "Co-Aut
       "ascii": "71.4,0,71.7,0,70.2,0,0,-63.0,3,-63.0,3,-63.0,3,0,-63.0,3,-63.0,3,-63.0,3,0,-63.0,3,-63.0,3,-63.0,3,0"
     },
     "0a990c1f-b61a-441c-8f7d-f775b6ff9400": { "ascii": "160,32,1,CH 1,0.0" },
-    "f7c21d1c-5cb9-4b9b-ab7e-e1d8e7a51724": { "ascii": "160,32,2,CH 2,0.0" },
-    "cfacb2d0-2d81-4c82-a168-13314e38a338": { "ascii": "160,32,3,CH 3,0.0" },
-    "c99c943f-da4b-4ee3-92ec-c806006e9e7f": { "ascii": "160,32,4,CH 4,0,0,255,0" },
+    "f7c21d1c-5cb9-4b9b-ab7e-e1d8e7a51724": { "ascii": "160,32,1,CH 2,0.0" },
+    "cfacb2d0-2d81-4c82-a168-13314e38a338": { "ascii": "160,32,1,CH 3,0.0" },
+    "c99c943f-da4b-4ee3-92ec-c806006e9e7f": { "ascii": "160,32,1,CH 4,0,0,255,0" },
     "3ce0c366-691f-43e6-b625-3f0912ff6ea7": { "ascii": "100,67,0,24:62:ab:e0:c1:be,v4.21" },
     "b4f1d66a-ecab-4e03-8b43-b9df904ebcdf": { "ascii": "MyWifi,1,iotservice.thermoworks.com,1" }
+  }
+}
+```
+
+`tests/fixtures/signals/capture-2026-09-v4.21-noprobe.json` — transcribed verbatim from `docs/captures/recon-2026-09-04-v4.21-noprobe.txt` (owner's unit, no probes attached). Note the trailing commas and 4-character labels; these are what the device really sends.
+
+```json
+{
+  "source": "docs/captures/recon-2026-09-04-v4.21-noprobe.txt",
+  "captured": "2026-09-04",
+  "firmware": "v4.21",
+  "scenario": "no probes attached, phone app closed, device presumed Fahrenheit",
+  "local_name": "TMW022",
+  "address": "24:0A:C4:EC:2E:0E",
+  "characteristics": {
+    "5f5f9010-0e0d-4bd4-b5dc-e4ff47a45984": {
+      "ascii": "-63.0,3,-63.0,3,-63.0,3,0,-63.0,3,-63.0,3,-63.0,3,0,-63.0,3,-63.0,3,-63.0,3,0,-63.0,3,-63.0,3,-63.0,3,0,"
+    },
+    "0a990c1f-b61a-441c-8f7d-f775b6ff9400": { "ascii": "360,225,0,Gril,0.0," },
+    "f7c21d1c-5cb9-4b9b-ab7e-e1d8e7a51724": { "ascii": "120,32,1,Roas,0.0," },
+    "cfacb2d0-2d81-4c82-a168-13314e38a338": { "ascii": "120,32,1,Roas,0.0," },
+    "c99c943f-da4b-4ee3-92ec-c806006e9e7f": { "ascii": "160,32,0,CH 4,0.0,225,0" },
+    "3ce0c366-691f-43e6-b625-3f0912ff6ea7": { "ascii": "66,0,0,24:0a:c4:ec:2e:0e,v4.21," },
+    "b4f1d66a-ecab-4e03-8b43-b9df904ebcdf": { "ascii": "Mo2Net,1,iotservice.thermoworks.com,1" }
   }
 }
 ```
@@ -696,23 +721,22 @@ class TestParseTemperatures:
 class TestParseProbeConfig:
     def test_fixture_probe_1(self, capture) -> None:
         cfg = parse_probe_config(capture[UUID_PROBE_CONFIG[0]], fahrenheit=True)
-        assert cfg == ProbeConfig(
-            alarm_high_c=pytest.approx(71.1, abs=0.05),
-            alarm_low_c=pytest.approx(0.0, abs=0.05),
-            channel=1,
-            label="CH 1",
-        )
+        assert cfg.alarm_high_c == pytest.approx(71.1, abs=0.05)
+        assert cfg.alarm_low_c == pytest.approx(0.0, abs=0.05)
+        assert cfg.flag == 1
+        assert cfg.label == "CH 1"
 
     def test_fixture_probe_4_with_trailing_fields(self, capture) -> None:
         cfg = parse_probe_config(capture[UUID_PROBE_CONFIG[3]], fahrenheit=True)
-        assert cfg.channel == 4
+        assert cfg.flag == 1
         assert cfg.label == "CH 4"
 
     def test_celsius_passthrough_and_custom_label(self) -> None:
-        cfg = parse_probe_config(b"95,60,2,Brisket,0.0", fahrenheit=False)
+        cfg = parse_probe_config(b"95,60,0,Bris,0.0,", fahrenheit=False)
         assert cfg.alarm_high_c == 95.0
         assert cfg.alarm_low_c == 60.0
-        assert cfg.label == "Brisket"
+        assert cfg.flag == 0
+        assert cfg.label == "Bris"
 
     def test_too_few_fields_raises(self) -> None:
         with pytest.raises(ValueError, match="expected at least 4 fields"):
@@ -722,10 +746,10 @@ class TestParseProbeConfig:
 class TestParseDeviceInfo:
     def test_fixture(self, capture) -> None:
         info = parse_device_info(capture[UUID_DEVICE_INFO])
-        assert info.battery_pct == 67
+        assert info.battery_pct == 100
         assert info.mac == "24:62:ab:e0:c1:be"
         assert info.firmware == "v4.21"
-        assert info.raw_fields[0] == "100"
+        assert info.raw_fields[1] == "67"
 
     def test_too_few_fields_raises(self) -> None:
         with pytest.raises(ValueError, match="expected at least 5 fields"):
@@ -733,7 +757,42 @@ class TestParseDeviceInfo:
 
     def test_battery_out_of_range_raises(self) -> None:
         with pytest.raises(ValueError):
-            parse_device_info(b"100,150,0,aa:bb:cc:dd:ee:ff,v4.21")
+            parse_device_info(b"150,0,0,aa:bb:cc:dd:ee:ff,v4.21")
+
+
+class TestCapture2026:
+    """Real payloads from the owner's unit: trailing commas, 4-char labels."""
+
+    @pytest.fixture
+    def capture26(self) -> dict[str, bytes]:
+        return load_capture("capture-2026-09-v4.21-noprobe.json")
+
+    def test_trailing_comma_and_no_probes(self, capture26) -> None:
+        probes = parse_temperatures(capture26[UUID_TEMPERATURES], fahrenheit=True)
+        assert len(probes) == 4
+        assert all(not p.connected and p.temperature_c is None for p in probes)
+
+    def test_probe_config_flag_and_truncated_label(self, capture26) -> None:
+        cfg = parse_probe_config(capture26[UUID_PROBE_CONFIG[0]], fahrenheit=True)
+        assert cfg.flag == 0
+        assert cfg.label == "Gril"
+        assert cfg.alarm_high_c == pytest.approx(182.2, abs=0.05)  # 360F
+        assert cfg.alarm_low_c == pytest.approx(107.2, abs=0.05)   # 225F
+        assert parse_probe_config(capture26[UUID_PROBE_CONFIG[1]], fahrenheit=True).flag == 1
+
+    def test_probe_4_extra_fields_ignored(self, capture26) -> None:
+        cfg = parse_probe_config(capture26[UUID_PROBE_CONFIG[3]], fahrenheit=True)
+        assert cfg.label == "CH 4"
+        assert cfg.flag == 0
+
+    def test_device_info_battery_is_field_0(self, capture26) -> None:
+        info = parse_device_info(capture26[UUID_DEVICE_INFO])
+        assert info.battery_pct == 66
+        assert info.mac == "24:0a:c4:ec:2e:0e"
+        assert info.firmware == "v4.21"
+
+    def test_wifi(self, capture26) -> None:
+        assert parse_wifi(capture26[UUID_WIFI]).ssid == "Mo2Net"
 
 
 class TestParseWifi:
@@ -809,8 +868,10 @@ class ProbeConfig:
 
     alarm_high_c: float | None
     alarm_low_c: float | None
-    channel: int
+    flag: int
+    """Raw field 2. Observed 0/1; meaning unknown (it is NOT the channel number)."""
     label: str
+    """Channel label as sent by the device (custom names are truncated to 4 chars)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -818,10 +879,12 @@ class DeviceInfo:
     """Device-level information."""
 
     battery_pct: int
+    """Field 0. Provisional: 2024 notes guessed field 1, but field 1 reads 0 on a
+    running unit while field 0 reads a plausible percentage."""
     mac: str
     firmware: str
     raw_fields: tuple[str, ...]
-    """All fields as received; field 0 (observed ``100``) is not yet understood."""
+    """All fields as received; fields 1 and 2 are not yet understood."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -875,20 +938,20 @@ def parse_temperatures(data: bytes, fahrenheit: bool) -> tuple[ProbeTemps, ...]:
 
 
 def parse_probe_config(data: bytes, fahrenheit: bool) -> ProbeConfig:
-    """Parse one probe-config characteristic: high, low, channel, label, ..."""
+    """Parse one probe-config characteristic: high, low, flag, label, ..."""
     fields = _fields(data, 4, "probe config")
     return ProbeConfig(
         alarm_high_c=_to_celsius(float(fields[0]), fahrenheit),
         alarm_low_c=_to_celsius(float(fields[1]), fahrenheit),
-        channel=int(fields[2]),
+        flag=int(fields[2]),
         label=fields[3].strip(),
     )
 
 
 def parse_device_info(data: bytes) -> DeviceInfo:
-    """Parse the device-info characteristic: ?, battery, ?, mac, firmware."""
+    """Parse the device-info characteristic: battery, ?, ?, mac, firmware."""
     fields = _fields(data, 5, "device info")
-    battery = int(fields[1])
+    battery = int(fields[0])
     if not 0 <= battery <= 100:
         raise ValueError(f"Signals device info: battery out of range: {battery}")
     return DeviceInfo(
@@ -918,8 +981,8 @@ Expected: all pass. If `test_negative_temperature_fahrenheit` fails on rounding,
 
 ```powershell
 .venv\Scripts\python -m ruff check custom_components tests
-git add custom_components/thermoworks_bt/ble/signals.py tests/ble/test_signals.py tests/fixtures/signals/capture-2024-01-v4.21.json
-git commit -m "feat(signals): add Signals CSV parsers with 2024 capture fixture" -m "Co-Authored-By: Claude <noreply@anthropic.com>"
+git add custom_components/thermoworks_bt/ble/signals.py tests/ble/test_signals.py tests/fixtures/signals/
+git commit -m "feat(signals): add Signals CSV parsers with capture fixtures" -m "Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
@@ -951,7 +1014,7 @@ from custom_components.thermoworks_bt.ble.signals import (
 
 ATTACHED = ProbeTemps(connected=True, temperature_c=90.0, max_c=95.0, min_c=20.0)
 EMPTY = ProbeTemps(connected=False, temperature_c=None, max_c=None, min_c=None)
-CFG = ProbeConfig(alarm_high_c=93.0, alarm_low_c=60.0, channel=1, label="CH 1")
+CFG = ProbeConfig(alarm_high_c=93.0, alarm_low_c=60.0, flag=1, label="CH 1")
 
 
 class TestAlarmState:
@@ -1264,7 +1327,7 @@ class TestSignalsAsyncRead:
         client = FakeClient(capture)
         reading = await SignalsDevice().async_read(client, timeout=1.0)
         assert reading.probes[0].connected is True
-        assert reading.configs[3].channel == 4
+        assert reading.configs[3].flag == 1
         assert reading.info.firmware == "v4.21"
         assert reading.wifi.connected is True
 

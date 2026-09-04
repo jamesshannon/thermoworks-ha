@@ -1,0 +1,25 @@
+# Read-only GATT enumeration of owner unit, 2026-09-04, firmware v4.21, no probes attached, phone app closed. Produced ad hoc by the controller (bleak, MO2_PC).
+connected True
+SVC 00001801-0000-1000-8000-00805f9b34fb
+  CH 00002a05-0000-1000-8000-00805f9b34fb ['indicate'] 
+SVC 00001800-0000-1000-8000-00805f9b34fb
+  CH 00002a00-0000-1000-8000-00805f9b34fb ['read']  => b''
+  CH 00002a01-0000-1000-8000-00805f9b34fb ['read']  => '\x00\x00'
+  CH 00002aa6-0000-1000-8000-00805f9b34fb ['read']  => '\x00'
+SVC 0000a002-0000-1000-8000-00805f9b34fb
+  CH 00002a00-0000-1000-8000-00805f9b34fb ['read', 'write']  => '0'
+  CH 00002a05-0000-1000-8000-00805f9b34fb ['indicate'] 
+  CH 5f5f9010-0e0d-4bd4-b5dc-e4ff47a45984 ['notify', 'read'] temps => '-63.0,3,-63.0,3,-63.0,3,0,-63.0,3,-63.0,3,-63.0,3,0,-63.0,3,-63.0,3,-63.0,3,0,-63.0,3,-63.0,3,-63.0,3,0,'
+  CH 0a990c1f-b61a-441c-8f7d-f775b6ff9400 ['notify', 'read', 'write'] probe1 => '360,225,0,Gril,0.0,'
+  CH f7c21d1c-5cb9-4b9b-ab7e-e1d8e7a51724 ['notify', 'read', 'write'] probe2 => '120,32,1,Roas,0.0,'
+  CH cfacb2d0-2d81-4c82-a168-13314e38a338 ['notify', 'read', 'write'] probe3 => '120,32,1,Roas,0.0,'
+  CH c99c943f-da4b-4ee3-92ec-c806006e9e7f ['notify', 'read', 'write'] probe4 => '160,32,0,CH 4,0.0,225,0'
+  CH 3ce0c366-691f-43e6-b625-3f0912ff6ea7 ['notify', 'read'] devinfo => '66,0,0,24:0a:c4:ec:2e:0e,v4.21,'
+  CH 7633f5bb-d0c6-478b-b031-d3a0d70c2a7e ['notify', 'read', 'write']  => '1'
+  CH 01817e20-b0f3-4a21-a577-50ec2d9a2fca ['notify', 'read', 'write']  => '\x00'
+  CH e6db3978-9be6-4c08-b597-460987e304d3 ['notify', 'read', 'write']  => '\x00'
+  CH b4f1d66a-ecab-4e03-8b43-b9df904ebcdf ['notify', 'read', 'write'] wifi => 'Mo2Net,1,iotservice.thermoworks.com,1'
+  CH db28403a-a7e1-4c2a-a109-a52913f50cc9 ['notify', 'read', 'write']  => '\x00'
+  CH e32e526f-d3f7-4686-b7ae-740662c7fa5d ['notify', 'read', 'write']  => '\x00'
+  CH 90bc0c13-7427-4552-9c7f-91ad2a95bf65 ['notify', 'read', 'write']  => '\x00'
+  CH 4e8a02fe-bb42-452d-b573-e0645f03c230 ['notify', 'write'] 

@@ -29,25 +29,29 @@ Expose a ThermoWorks Signals 4-channel thermometer to Home Assistant **without t
 
 Rejected alternatives: WiFi/cloud interception (device talks TLS to `iotservice.thermoworks.com`; unknown pinning, brittle across firmware updates); custom ESP32 firmware (already failed by others); ESPHome-native `ble_client` YAML (ties device to one proxy, holds the connection open, no discovery, brittle lambda parsing).
 
-## 3. Signals BLE protocol (as captured Jan 2024, firmware v4.21)
+## 3. Signals BLE protocol (firmware v4.21)
 
-Source: `wnoisephx/thermoworks-ble/Docs/Signals.txt` and `POC/parser-signels.py`. **Must be re-verified in Phase 1 (§8) before parser fixtures are finalized.**
+Sources: `wnoisephx/thermoworks-ble/Docs/Signals.txt` (Jan 2024) and a read-only GATT enumeration of the owner's unit on 2026-09-04 (`docs/captures/recon-2026-09-04-v4.21-noprobe.txt`; same firmware). **Remaining unknowns are resolved in Phase 1 (§8).**
 
-- **Advertisement:** local name `TMW022`; manufacturer data id `25124` (0x6224) carrying the last 4 bytes of the MAC. The advertisement is static — no sensor data — so an **active GATT connection** is required for every read. ESP32 ESPHome proxies support active connections; Shelly proxies do not.
-- **Payload encoding:** ASCII, comma-separated, no terminator observed. Not binary.
+- **Advertisement:** local name `TMW022`; manufacturer data key = first two MAC bytes little-endian (`0x0A24` for `24:0A:…`, `0x6224` for `24:62:…`), payload = remaining four MAC bytes. The advertisement is static — no sensor data — so an **active GATT connection** is required for every read. ESP32 ESPHome proxies support active connections; Shelly proxies do not.
+- **Service:** `0000a002-0000-1000-8000-00805f9b34fb` holds every ThermoWorks characteristic.
+- **Payload encoding:** ASCII, comma-separated, usually with a **trailing comma** (so `split(",")` yields one extra empty field — parsers must tolerate extra fields). Not binary.
+- **Every data characteristic below also has `notify`** — v1 polls with reads; a later version can subscribe instead.
 
-| Purpose | UUID | Example | Layout |
+| Purpose | UUID | 2026 example | Layout |
 |---|---|---|---|
-| Temperatures, all probes | `5F5F9010-0E0D-4BD4-B5DC-E4FF47A45984` | `71.4,0,71.7,0,70.2,0,0,-63.0,3,-63.0,3,-63.0,3,0,…` | 7 fields per probe × 4 = 28 fields. Per probe at offset `p*7`: `[0]` current temp, `[1]` state, `[2]` session max, `[3]` state, `[4]` session min, `[5]` state, `[6]` `0` (end). State `0` = probe attached, `3` = no probe; temp reads `-63.0` when no probe. |
-| Probe 1 config | `0A990C1F-B61A-441C-8F7D-F775B6FF9400` | `160,32,1,CH 1,0.0` | `[0]` high alarm, `[1]` low alarm, `[2]` channel number, `[3]` channel label, `[4]` unknown (`0.0`) |
-| Probe 2 config | `F7C21D1C-5CB9-4B9B-AB7E-E1D8E7A51724` | same | same |
-| Probe 3 config | `CFACB2D0-2D81-4C82-A168-13314E38A338` | same | same |
-| Probe 4 config | `C99C943F-DA4B-4EE3-92EC-C806006E9E7F` | `160,32,1,CH 4,0,0,255,0` | same, plus trailing `255,0` (unknown; parser ignores extra fields) |
-| Device info | `3CE0C366-691F-43E6-B625-3F0912FF6EA7` | `100,67,0,24:62:ab:e0:c1:be,v4.21` | `[0]` unknown (`100`), `[1]` battery %, `[2]` unknown, `[3]` MAC, `[4]` firmware |
-| WiFi | `B4F1D66A-ECAB-4E03-8B43-B9DF904EBCDF` | `MyWifi,1,iotservice.thermoworks.com,1` | `[0]` SSID, `[1]` flag (1 = connected?), `[2]` cloud host, `[3]` flag |
-| Unknown ×7 | `7633F5BB-…`, `01817E20-…`, `E6DB3978-…`, `DB28403A-…`, `E32E526F-…`, `90BC0C13-…`, `4E8A02FE-…` | `1` or empty | Presumed write side (alarms, units, Billows). **Never written in v1.** |
+| Temperatures, all probes | `5F5F9010-0E0D-4BD4-B5DC-E4FF47A45984` (read, notify) | `-63.0,3,-63.0,3,-63.0,3,0,` ×4 (no probes); 2024 with probe: `71.4,0,71.7,0,70.2,0,0,…` | 7 fields per probe × 4 = 28 fields (+ trailing empty). Per probe at offset `p*7`: `[0]` current temp, `[1]` state, `[2]` session max, `[3]` state, `[4]` session min, `[5]` state, `[6]` `0`. State `0` = probe attached, `3` = no probe; temp reads `-63.0` when no probe. |
+| Probe 1 config | `0A990C1F-B61A-441C-8F7D-F775B6FF9400` (read, write, notify) | `360,225,0,Gril,0.0,` | `[0]` high alarm, `[1]` low alarm, `[2]` **flag, meaning unknown** (`0`/`1`; NOT a channel number — observed `0,1,1,0` across probes 1–4), `[3]` label (**device truncates to 4 chars**: `Gril`, `Roas`), `[4]` unknown (`0.0`) |
+| Probe 2 config | `F7C21D1C-5CB9-4B9B-AB7E-E1D8E7A51724` | `120,32,1,Roas,0.0,` | same |
+| Probe 3 config | `CFACB2D0-2D81-4C82-A168-13314E38A338` | `120,32,1,Roas,0.0,` | same |
+| Probe 4 config | `C99C943F-DA4B-4EE3-92EC-C806006E9E7F` | `160,32,0,CH 4,0.0,225,0` (2024: `160,32,1,CH 4,0,0,255,0`) | same, plus trailing `<n>,0` — `225` strongly suggests the pit/Billows target for channel 4; unused in v1 |
+| Device info | `3CE0C366-691F-43E6-B625-3F0912FF6EA7` (read, notify) | `66,0,0,24:0a:c4:ec:2e:0e,v4.21,` (2024: `100,67,0,…,v4.21`) | `[0]` **battery % (provisional** — 2024 notes guessed `[1]`, but `[1]` reads `0` on a running unit), `[1]` unknown, `[2]` unknown, `[3]` MAC, `[4]` firmware. Phase 1 confirms by comparing `[0]` with the app's battery display. |
+| WiFi | `B4F1D66A-ECAB-4E03-8B43-B9DF904EBCDF` (read, write, notify) | `Mo2Net,1,iotservice.thermoworks.com,1` | `[0]` SSID, `[1]` flag (1 = connected?), `[2]` cloud host, `[3]` flag |
+| Unknown ×6 | `7633F5BB-…` (`1`), `01817E20-…`, `E6DB3978-…`, `DB28403A-…`, `E32E526F-…`, `90BC0C13-…` (all `\x00`) | read, write, notify | Presumed settings/command side (units, alarm arming, Billows). `7633F5BB` = `1` in both captures — candidate unit flag. **Never written in v1.** |
+| Unknown | `4E8A02FE-BB42-452D-B573-E0645F03C230` | write, notify only | Command channel. **Never written in v1.** |
+| Generic | `00002a00` in service `a002` | read, write | `'0'` — unknown |
 
-Open questions (answered by Phase 1): unit flag location (°F vs °C); meaning of device-info `[0]`; whether any characteristic notifies; whether the low-alarm value `32` means "disabled/default".
+Open questions (answered by Phase 1): unit flag location (°F vs °C) — candidates: `7633F5BB`, device-info `[1]`/`[2]`; confirm battery = device-info `[0]`; meaning of probe-config `[2]`; whether the low-alarm value `32` means "disabled/default".
 
 ## 4. Entities and data model
 
@@ -67,9 +71,9 @@ One HA device per Signals, identified by BLE MAC. Entity keys are stable and do 
 | `wifi_connected` | binary_sensor | connectivity | wifi `[1] == 1` | diagnostic |
 | RSSI | sensor | dBm | advertisement (already provided by base class) | diagnostic, disabled by default |
 
-| `probe_{n}_channel_label` | sensor | text (no class) | probe-config `[3]` (`CH 1` or user-renamed) | diagnostic |
+| `probe_{n}_channel_label` | sensor | text (no class) | probe-config `[3]` (`CH 1` or user-renamed; the device truncates custom labels to 4 characters) | diagnostic |
 
-Device info (firmware, MAC) goes into the HA device registry via `set_device_sw_version` / connections. SSID is not surfaced (low value, mild privacy).
+Device info (firmware, MAC) goes into the HA device registry via `set_device_sw_version` / connections. SSID is not surfaced (low value, mild privacy). Battery is read from device-info field 0 (provisional, see §3).
 
 ### 4.2 Derived alarms
 
@@ -128,9 +132,9 @@ Pure parsing, no I/O, one function per characteristic. Each: decode ASCII (`erro
 @dataclass(frozen=True, slots=True)
 class ProbeTemps:   connected: bool; temperature_c: float | None; max_c: float | None; min_c: float | None
 @dataclass(frozen=True, slots=True)
-class ProbeConfig:  alarm_high_c: float | None; alarm_low_c: float | None; channel: int; label: str
+class ProbeConfig:  alarm_high_c: float | None; alarm_low_c: float | None; flag: int; label: str   # flag = field [2], semantics unknown
 @dataclass(frozen=True, slots=True)
-class DeviceInfo:   battery_pct: int; mac: str; firmware: str
+class DeviceInfo:   battery_pct: int; mac: str; firmware: str; raw_fields: tuple[str, ...]   # battery from field [0], provisional
 @dataclass(frozen=True, slots=True)
 class WifiInfo:     ssid: str; connected: bool; cloud_host: str   # ssid/host parsed for tests/debug, not surfaced as entities
 @dataclass(frozen=True, slots=True)
@@ -212,7 +216,7 @@ Hardware acceptance (manual): install via HACS custom repository → ESP32 proxy
 
 **Read-only guarantee:** the script never calls `write_gatt_char`.
 
-Manual scenarios (checklist in `docs/protocol/phase1-verification.md`): baseline (1 probe); attach probe 2; toggle °F→°C; change probe-1 high alarm on unit; set a low alarm to confirm `32` semantics; disconnect WiFi. Each scenario = one JSON capture.
+Manual scenarios (checklist in `docs/protocol/phase1-verification.md`): baseline (1 probe); attach probe 2; toggle °F→°C; change probe-1 high alarm on unit; set a low alarm to confirm `32` semantics; disconnect WiFi; read the battery % shown in the ThermoWorks app (then close the app) to confirm device-info field 0. Each scenario = one JSON capture.
 
 ## 9. Handoff documentation
 
