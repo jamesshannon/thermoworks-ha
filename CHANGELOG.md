@@ -50,7 +50,7 @@ Initial release.
 - Support for intermittent/battery-operated devices
 - Based on Home Assistant's ActiveBluetoothProcessorCoordinator pattern
 
-[0.10.0]: https://github.com/sjmotew/thermoworks-ha/releases/tag/v0.10.0
-[0.9.2]: https://github.com/sjmotew/thermoworks-ha/releases/tag/v0.9.2
+[0.10.0]: https://github.com/jamesshannon/thermoworks-ha/releases/tag/v0.10.0
+[0.9.2]: https://github.com/jamesshannon/thermoworks-ha/releases/tag/v0.9.2
 [0.9.1]: https://github.com/jamesshannon/thermoworks-ha/releases/tag/v0.9.1
 [0.1.0]: https://github.com/jamesshannon/thermoworks-ha/releases/tag/v0.1.0
