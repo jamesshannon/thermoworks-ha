@@ -2,8 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import struct
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from sensor_state_data import BinarySensorDeviceClass, SensorData, SensorLibrary
+
+from .device import DeviceDriver
+
+if TYPE_CHECKING:
+    from bleak import BleakClient
+
+_LOGGER = logging.getLogger(__name__)
 
 # GATT characteristic UUID for BlueDOT temperature notifications.
 CHARACTERISTIC_UUID = "783f2991-23e0-4bdc-ac16-78601bd84b39"
@@ -114,3 +126,83 @@ def is_bluedot(name: str | None) -> bool:
     if name is None:
         return False
     return name.startswith("BlueDOT")
+
+
+class BlueDOTDevice(DeviceDriver):
+    """Driver for the ThermoWorks BlueDOT single-probe thermometer.
+
+    BlueDOT does not expose a readable temperature characteristic; it pushes a
+    20-byte notification shortly after a client subscribes. ``async_read``
+    subscribes, waits for exactly one notification, and unsubscribes.
+    """
+
+    device_type = "BlueDOT"
+    min_poll_interval = 30.0
+
+    @classmethod
+    def matches(cls, local_name: str | None) -> bool:
+        """Return True if the advertised local name is a BlueDOT device."""
+        return is_bluedot(local_name)
+
+    async def async_read(
+        self, client: BleakClient, *, timeout: float
+    ) -> BlueDOTReading:
+        """Subscribe, wait for one notification, unsubscribe, and return it."""
+        from bleak.exc import BleakError
+
+        reading_event = asyncio.Event()
+        reading: BlueDOTReading | None = None
+
+        def _on_notification(_sender: int, data: bytearray) -> None:
+            nonlocal reading
+            _LOGGER.debug("Received notification: %s", data.hex())
+            try:
+                reading = parse_notification_data(bytes(data))
+            except ValueError:
+                _LOGGER.warning(
+                    "Failed to parse BlueDOT notification: %s", data.hex()
+                )
+                return
+            reading_event.set()
+
+        try:
+            await client.start_notify(CHARACTERISTIC_UUID, _on_notification)
+        except BleakError as err:
+            if "Notify acquired" not in str(err):
+                raise
+            _LOGGER.debug("Notification already subscribed; retrying after cleanup")
+            await asyncio.sleep(0.5)
+            try:
+                await client.stop_notify(CHARACTERISTIC_UUID)
+            except Exception as err:  # noqa: BLE001 - best effort cleanup
+                _LOGGER.debug("Error stopping stale notification: %s", err)
+            await client.start_notify(CHARACTERISTIC_UUID, _on_notification)
+
+        try:
+            await asyncio.wait_for(reading_event.wait(), timeout=timeout)
+        finally:
+            try:
+                await client.stop_notify(CHARACTERISTIC_UUID)
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug("Error stopping notifications: %s", err)
+
+        assert reading is not None
+        return reading
+
+    def apply(self, reading: BlueDOTReading, data: SensorData) -> None:
+        """Translate a BlueDOT reading into temperature/binary sensor keys."""
+        data.update_predefined_sensor(
+            SensorLibrary.TEMPERATURE__CELSIUS, reading.temperature_celsius
+        )
+        data.update_binary_sensor(
+            key="probe_connected",
+            native_value=reading.probe_connected,
+            device_class=BinarySensorDeviceClass.CONNECTIVITY,
+            name="Probe",
+        )
+        data.update_binary_sensor(
+            key="alarm_active",
+            native_value=reading.alarm_active,
+            device_class=BinarySensorDeviceClass.PROBLEM,
+            name="Alarm",
+        )

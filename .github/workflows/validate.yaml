@@ -51,4 +51,4 @@ jobs:
       - name: Run HA integration tests
         env:
           PYTHONPATH: ${{ github.workspace }}
-        run: pytest tests/ha/ -v --tb=short || true
+        run: pytest tests/ha/ -v --tb=short

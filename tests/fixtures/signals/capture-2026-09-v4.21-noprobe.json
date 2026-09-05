@@ -1,0 +1,31 @@
+{
+  "source": "docs/captures/recon-2026-09-04-v4.21-noprobe.txt",
+  "captured": "2026-09-04",
+  "firmware": "v4.21",
+  "scenario": "no probes attached, phone app closed, device presumed Fahrenheit",
+  "local_name": "TMW022",
+  "address": "24:0A:C4:00:00:01",
+  "characteristics": {
+    "5f5f9010-0e0d-4bd4-b5dc-e4ff47a45984": {
+      "ascii": "-63.0,3,-63.0,3,-63.0,3,0,-63.0,3,-63.0,3,-63.0,3,0,-63.0,3,-63.0,3,-63.0,3,0,-63.0,3,-63.0,3,-63.0,3,0,"
+    },
+    "0a990c1f-b61a-441c-8f7d-f775b6ff9400": {
+      "ascii": "360,225,0,Gril,0.0,"
+    },
+    "f7c21d1c-5cb9-4b9b-ab7e-e1d8e7a51724": {
+      "ascii": "120,32,1,Roas,0.0,"
+    },
+    "cfacb2d0-2d81-4c82-a168-13314e38a338": {
+      "ascii": "120,32,1,Roas,0.0,"
+    },
+    "c99c943f-da4b-4ee3-92ec-c806006e9e7f": {
+      "ascii": "160,32,0,CH 4,0.0,225,0"
+    },
+    "3ce0c366-691f-43e6-b625-3f0912ff6ea7": {
+      "ascii": "66,0,0,24:0a:c4:00:00:01,v4.21,"
+    },
+    "b4f1d66a-ecab-4e03-8b43-b9df904ebcdf": {
+      "ascii": "MyWifi,1,iotservice.thermoworks.com,1"
+    }
+  }
+}

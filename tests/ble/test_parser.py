@@ -318,3 +318,35 @@ class TestAsyncPoll:
             await device.async_poll(ble_device)
 
         mock_client.disconnect.assert_called_once()
+
+
+class TestDriverSelection:
+    """Tests that the parser selects a driver from the advertised name."""
+
+    def test_driver_is_none_before_update(self) -> None:
+        device = ThermoWorksBluetoothDeviceData()
+        assert device.driver is None
+
+    def test_driver_selected_on_update(self) -> None:
+        from custom_components.thermoworks_bt.ble.bluedot import BlueDOTDevice
+
+        device = ThermoWorksBluetoothDeviceData()
+        device.update(_make_service_info(name="BlueDOT"))
+        assert isinstance(device.driver, BlueDOTDevice)
+
+    def test_poll_interval_comes_from_driver(self) -> None:
+        device = ThermoWorksBluetoothDeviceData()
+        device.update(_make_service_info(name="BlueDOT"))
+        with patch(
+            "custom_components.thermoworks_bt.ble.parser.monotonic_time_coarse",
+            return_value=100.0 + device.driver.min_poll_interval + 1,
+        ):
+            assert device.poll_needed(_make_service_info(), 100.0) is True
+
+    @pytest.mark.asyncio
+    async def test_poll_without_driver_raises(self) -> None:
+        device = ThermoWorksBluetoothDeviceData()
+        ble_device = MagicMock()
+        ble_device.address = "AA:BB:CC:DD:EE:FF"
+        with pytest.raises(RuntimeError):
+            await device.async_poll(ble_device)

@@ -1,0 +1,341 @@
+{
+  "captured": "2026-09-04T22:00:47+00:00",
+  "scenario": "baseline",
+  "address": "24:0A:C4:00:00:01",
+  "services": [
+    {
+      "uuid": "00001801-0000-1000-8000-00805f9b34fb",
+      "description": "Generic Attribute Profile",
+      "chars": [
+        {
+          "uuid": "00002a05-0000-1000-8000-00805f9b34fb",
+          "properties": [
+            "indicate"
+          ]
+        }
+      ]
+    },
+    {
+      "uuid": "00001800-0000-1000-8000-00805f9b34fb",
+      "description": "Generic Access Profile",
+      "chars": [
+        {
+          "uuid": "00002a00-0000-1000-8000-00805f9b34fb",
+          "properties": [
+            "read"
+          ]
+        },
+        {
+          "uuid": "00002a01-0000-1000-8000-00805f9b34fb",
+          "properties": [
+            "read"
+          ]
+        },
+        {
+          "uuid": "00002aa6-0000-1000-8000-00805f9b34fb",
+          "properties": [
+            "read"
+          ]
+        }
+      ]
+    },
+    {
+      "uuid": "0000a002-0000-1000-8000-00805f9b34fb",
+      "description": "Vendor specific",
+      "chars": [
+        {
+          "uuid": "00002a00-0000-1000-8000-00805f9b34fb",
+          "properties": [
+            "read",
+            "write"
+          ]
+        },
+        {
+          "uuid": "00002a05-0000-1000-8000-00805f9b34fb",
+          "properties": [
+            "indicate"
+          ]
+        },
+        {
+          "uuid": "5f5f9010-0e0d-4bd4-b5dc-e4ff47a45984",
+          "properties": [
+            "notify",
+            "read"
+          ]
+        },
+        {
+          "uuid": "0a990c1f-b61a-441c-8f7d-f775b6ff9400",
+          "properties": [
+            "notify",
+            "read",
+            "write"
+          ]
+        },
+        {
+          "uuid": "f7c21d1c-5cb9-4b9b-ab7e-e1d8e7a51724",
+          "properties": [
+            "notify",
+            "read",
+            "write"
+          ]
+        },
+        {
+          "uuid": "cfacb2d0-2d81-4c82-a168-13314e38a338",
+          "properties": [
+            "notify",
+            "read",
+            "write"
+          ]
+        },
+        {
+          "uuid": "c99c943f-da4b-4ee3-92ec-c806006e9e7f",
+          "properties": [
+            "notify",
+            "read",
+            "write"
+          ]
+        },
+        {
+          "uuid": "3ce0c366-691f-43e6-b625-3f0912ff6ea7",
+          "properties": [
+            "notify",
+            "read"
+          ]
+        },
+        {
+          "uuid": "7633f5bb-d0c6-478b-b031-d3a0d70c2a7e",
+          "properties": [
+            "notify",
+            "read",
+            "write"
+          ]
+        },
+        {
+          "uuid": "01817e20-b0f3-4a21-a577-50ec2d9a2fca",
+          "properties": [
+            "notify",
+            "read",
+            "write"
+          ]
+        },
+        {
+          "uuid": "e6db3978-9be6-4c08-b597-460987e304d3",
+          "properties": [
+            "notify",
+            "read",
+            "write"
+          ]
+        },
+        {
+          "uuid": "b4f1d66a-ecab-4e03-8b43-b9df904ebcdf",
+          "properties": [
+            "notify",
+            "read",
+            "write"
+          ]
+        },
+        {
+          "uuid": "db28403a-a7e1-4c2a-a109-a52913f50cc9",
+          "properties": [
+            "notify",
+            "read",
+            "write"
+          ]
+        },
+        {
+          "uuid": "e32e526f-d3f7-4686-b7ae-740662c7fa5d",
+          "properties": [
+            "notify",
+            "read",
+            "write"
+          ]
+        },
+        {
+          "uuid": "90bc0c13-7427-4552-9c7f-91ad2a95bf65",
+          "properties": [
+            "notify",
+            "read",
+            "write"
+          ]
+        },
+        {
+          "uuid": "4e8a02fe-bb42-452d-b573-e0645f03c230",
+          "properties": [
+            "notify",
+            "write"
+          ]
+        }
+      ]
+    }
+  ],
+  "characteristics": {
+    "00002a05-0000-1000-8000-00805f9b34fb": {
+      "properties": [
+        "indicate"
+      ],
+      "service": "0000a002-0000-1000-8000-00805f9b34fb"
+    },
+    "00002a00-0000-1000-8000-00805f9b34fb": {
+      "properties": [
+        "read",
+        "write"
+      ],
+      "service": "0000a002-0000-1000-8000-00805f9b34fb",
+      "hex": "30",
+      "ascii": "0"
+    },
+    "00002a01-0000-1000-8000-00805f9b34fb": {
+      "properties": [
+        "read"
+      ],
+      "service": "00001800-0000-1000-8000-00805f9b34fb",
+      "hex": "0000",
+      "ascii": "\u0000\u0000"
+    },
+    "00002aa6-0000-1000-8000-00805f9b34fb": {
+      "properties": [
+        "read"
+      ],
+      "service": "00001800-0000-1000-8000-00805f9b34fb",
+      "hex": "00",
+      "ascii": "\u0000"
+    },
+    "5f5f9010-0e0d-4bd4-b5dc-e4ff47a45984": {
+      "properties": [
+        "notify",
+        "read"
+      ],
+      "service": "0000a002-0000-1000-8000-00805f9b34fb",
+      "hex": "37382e332c302c38312e302c302c37362e382c302c302c2d36332e302c332c2d36332e302c332c2d36332e302c332c302c2d36332e302c332c2d36332e302c332c2d36332e302c332c302c2d36332e302c332c2d36332e302c332c2d36332e302c332c302c",
+      "ascii": "78.3,0,81.0,0,76.8,0,0,-63.0,3,-63.0,3,-63.0,3,0,-63.0,3,-63.0,3,-63.0,3,0,-63.0,3,-63.0,3,-63.0,3,0,"
+    },
+    "0a990c1f-b61a-441c-8f7d-f775b6ff9400": {
+      "properties": [
+        "notify",
+        "read",
+        "write"
+      ],
+      "service": "0000a002-0000-1000-8000-00805f9b34fb",
+      "hex": "3336302c3232352c302c4772696c2c302e302c",
+      "ascii": "360,225,0,Gril,0.0,"
+    },
+    "f7c21d1c-5cb9-4b9b-ab7e-e1d8e7a51724": {
+      "properties": [
+        "notify",
+        "read",
+        "write"
+      ],
+      "service": "0000a002-0000-1000-8000-00805f9b34fb",
+      "hex": "3132302c33322c312c526f61732c302e302c",
+      "ascii": "120,32,1,Roas,0.0,"
+    },
+    "cfacb2d0-2d81-4c82-a168-13314e38a338": {
+      "properties": [
+        "notify",
+        "read",
+        "write"
+      ],
+      "service": "0000a002-0000-1000-8000-00805f9b34fb",
+      "hex": "3132302c33322c312c526f61732c302e302c",
+      "ascii": "120,32,1,Roas,0.0,"
+    },
+    "c99c943f-da4b-4ee3-92ec-c806006e9e7f": {
+      "properties": [
+        "notify",
+        "read",
+        "write"
+      ],
+      "service": "0000a002-0000-1000-8000-00805f9b34fb",
+      "hex": "3136302c33322c302c434820342c302e302c3232352c30",
+      "ascii": "160,32,0,CH 4,0.0,225,0"
+    },
+    "3ce0c366-691f-43e6-b625-3f0912ff6ea7": {
+      "properties": [
+        "notify",
+        "read"
+      ],
+      "service": "0000a002-0000-1000-8000-00805f9b34fb",
+      "hex": "38342c302c302c32343a30613a63343a30303a30303a30312c76342e32312c",
+      "ascii": "84,0,0,24:0a:c4:00:00:01,v4.21,"
+    },
+    "7633f5bb-d0c6-478b-b031-d3a0d70c2a7e": {
+      "properties": [
+        "notify",
+        "read",
+        "write"
+      ],
+      "service": "0000a002-0000-1000-8000-00805f9b34fb",
+      "hex": "31",
+      "ascii": "1"
+    },
+    "01817e20-b0f3-4a21-a577-50ec2d9a2fca": {
+      "properties": [
+        "notify",
+        "read",
+        "write"
+      ],
+      "service": "0000a002-0000-1000-8000-00805f9b34fb",
+      "hex": "00",
+      "ascii": "\u0000"
+    },
+    "e6db3978-9be6-4c08-b597-460987e304d3": {
+      "properties": [
+        "notify",
+        "read",
+        "write"
+      ],
+      "service": "0000a002-0000-1000-8000-00805f9b34fb",
+      "hex": "00",
+      "ascii": "\u0000"
+    },
+    "b4f1d66a-ecab-4e03-8b43-b9df904ebcdf": {
+      "properties": [
+        "notify",
+        "read",
+        "write"
+      ],
+      "service": "0000a002-0000-1000-8000-00805f9b34fb",
+      "hex": "4d79576966692c312c696f74736572766963652e746865726d6f776f726b732e636f6d2c31",
+      "ascii": "MyWifi,1,iotservice.thermoworks.com,1"
+    },
+    "db28403a-a7e1-4c2a-a109-a52913f50cc9": {
+      "properties": [
+        "notify",
+        "read",
+        "write"
+      ],
+      "service": "0000a002-0000-1000-8000-00805f9b34fb",
+      "hex": "00",
+      "ascii": "\u0000"
+    },
+    "e32e526f-d3f7-4686-b7ae-740662c7fa5d": {
+      "properties": [
+        "notify",
+        "read",
+        "write"
+      ],
+      "service": "0000a002-0000-1000-8000-00805f9b34fb",
+      "hex": "00",
+      "ascii": "\u0000"
+    },
+    "90bc0c13-7427-4552-9c7f-91ad2a95bf65": {
+      "properties": [
+        "notify",
+        "read",
+        "write"
+      ],
+      "service": "0000a002-0000-1000-8000-00805f9b34fb",
+      "hex": "00",
+      "ascii": "\u0000"
+    },
+    "4e8a02fe-bb42-452d-b573-e0645f03c230": {
+      "properties": [
+        "notify",
+        "write"
+      ],
+      "service": "0000a002-0000-1000-8000-00805f9b34fb"
+    }
+  },
+  "notifications": [],
+  "firmware": "v4.21"
+}

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from sensor_state_data import DeviceClass, DeviceKey, SensorUpdate, Units
-
 from homeassistant.components.bluetooth.passive_update_processor import (
     PassiveBluetoothDataProcessor,
     PassiveBluetoothDataUpdate,
@@ -17,12 +15,21 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
+    PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+    EntityCategory,
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.sensor import sensor_device_info_to_hass_device_info
+from sensor_state_data import (
+    DeviceClass,
+    DeviceKey,
+    SensorDescription,
+    SensorUpdate,
+    Units,
+)
 
 from . import ThermoWorksConfigEntry
 
@@ -32,6 +39,13 @@ SENSOR_DESCRIPTIONS = {
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
+    ),
+    (DeviceClass.BATTERY, Units.PERCENTAGE): SensorEntityDescription(
+        key=f"{DeviceClass.BATTERY}_{Units.PERCENTAGE}",
+        device_class=SensorDeviceClass.BATTERY,
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     (
         DeviceClass.SIGNAL_STRENGTH,
@@ -47,6 +61,40 @@ SENSOR_DESCRIPTIONS = {
         entity_registry_enabled_default=False,
     ),
 }
+
+_DIAGNOSTIC_TEMPERATURE = SensorEntityDescription(
+    key="diagnostic_temperature",
+    device_class=SensorDeviceClass.TEMPERATURE,
+    native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+    state_class=SensorStateClass.MEASUREMENT,
+    entity_category=EntityCategory.DIAGNOSTIC,
+)
+_CHANNEL_LABEL = SensorEntityDescription(
+    key="channel_label",
+    entity_category=EntityCategory.DIAGNOSTIC,
+)
+
+# Per-key overrides take precedence over the (device_class, unit) defaults.
+# Signals emits these keys (see ble/signals.py::SignalsDevice.apply).
+SENSOR_DESCRIPTION_OVERRIDES: dict[str, SensorEntityDescription] = {
+    **{
+        f"probe_{n}_{suffix}": _DIAGNOSTIC_TEMPERATURE
+        for n in range(1, 5)
+        for suffix in ("max", "min", "alarm_high_setpoint", "alarm_low_setpoint")
+    },
+    **{f"probe_{n}_channel_label": _CHANNEL_LABEL for n in range(1, 5)},
+}
+
+
+def _description_for(
+    device_key: DeviceKey, description: SensorDescription
+) -> SensorEntityDescription | None:
+    """Pick the HA entity description for a sensor-state-data description."""
+    if (override := SENSOR_DESCRIPTION_OVERRIDES.get(device_key.key)) is not None:
+        return override
+    return SENSOR_DESCRIPTIONS.get(
+        (description.device_class, description.native_unit_of_measurement)
+    )
 
 
 def _device_key_to_bluetooth_entity_key(
@@ -66,12 +114,9 @@ def sensor_update_to_bluetooth_data_update(
             for device_id, device_info in sensor_update.devices.items()
         },
         entity_descriptions={
-            _device_key_to_bluetooth_entity_key(device_key): SENSOR_DESCRIPTIONS[
-                (description.device_class, description.native_unit_of_measurement)
-            ]
+            _device_key_to_bluetooth_entity_key(device_key): ha_description
             for device_key, description in sensor_update.entity_descriptions.items()
-            if (description.device_class, description.native_unit_of_measurement)
-            in SENSOR_DESCRIPTIONS
+            if (ha_description := _description_for(device_key, description)) is not None
         },
         entity_data={
             _device_key_to_bluetooth_entity_key(device_key): sensor_values.native_value
@@ -105,13 +150,13 @@ async def async_setup_entry(
 
 class ThermoWorksBluetoothSensorEntity(
     PassiveBluetoothProcessorEntity[
-        PassiveBluetoothDataProcessor[float | int | None, SensorUpdate]
+        PassiveBluetoothDataProcessor[str | float | int | None, SensorUpdate]
     ],
     SensorEntity,
 ):
     """Representation of a ThermoWorks BLE sensor."""
 
     @property
-    def native_value(self) -> int | float | None:
+    def native_value(self) -> str | int | float | None:
         """Return the native value."""
         return self.processor.entity_data.get(self.entity_key)

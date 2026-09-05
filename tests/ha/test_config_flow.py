@@ -96,3 +96,27 @@ async def test_already_configured(hass: HomeAssistant) -> None:
     )
     assert result2["type"] is FlowResultType.ABORT
     assert result2["reason"] == "already_configured"
+
+
+async def test_bluetooth_discovery_signals(hass: HomeAssistant) -> None:
+    """Test discovery via bluetooth with a Signals device."""
+    from . import SIGNALS_SERVICE_INFO
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_BLUETOOTH},
+        data=SIGNALS_SERVICE_INFO,
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "bluetooth_confirm"
+
+    with patch(
+        "custom_components.thermoworks_bt.async_setup_entry", return_value=True
+    ):
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={}
+        )
+
+    assert result2["type"] is FlowResultType.CREATE_ENTRY
+    assert result2["title"] == "Signals C1BE"
+    assert result2["result"].unique_id == "24:62:AB:E0:C1:BE"
